@@ -36,17 +36,17 @@ const (
 
 // Limits from the plan.
 const (
-	ReasonMin           = 10
-	ReasonMax           = 400
-	MaxPendingPerAgent  = 3
-	MinDuration         = time.Minute
-	LorInfraDefault     = 15 * time.Minute
-	ClockSkew           = 2 * time.Minute
-	MaxNoteLen          = 1000
-	MaxArgvBytes        = 4096
-	SystemActor         = "system"
-	originAgentRequest  = "agent_request"
-	originAdminOffer    = "admin_offer"
+	ReasonMin          = 10
+	ReasonMax          = 400
+	MaxPendingPerAgent = 3
+	MinDuration        = time.Minute
+	LorInfraDefault    = 15 * time.Minute
+	ClockSkew          = 2 * time.Minute
+	MaxNoteLen         = 1000
+	MaxArgvBytes       = 4096
+	SystemActor        = "system"
+	originAgentRequest = "agent_request"
+	originAdminOffer   = "admin_offer"
 )
 
 // Config holds the grant policy settings.
