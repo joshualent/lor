@@ -1,0 +1,9 @@
+package: adminapi
+generate:
+  models: true
+  std-http-server: true
+  strict-server: true
+  embedded-spec: false
+output: internal/server/adminapi/admin.gen.go
+output-options:
+  skip-prune: true

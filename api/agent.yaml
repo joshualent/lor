@@ -1,0 +1,369 @@
+openapi: 3.0.3
+info:
+  title: Lor agent API
+  version: 1.0.0
+  description: |
+    Used by the `lor` CLI. Served only on the agent listener (`agent_listen`),
+    over TLS with Lor's self-signed certificate (pinned by the CLI).
+    Every request except `POST /enroll` needs `Authorization: Bearer <token>`
+    and must come from one of the agent's registered LAN IPs.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /enroll:
+    post:
+      operationId: Enroll
+      summary: Exchange a one-time enrollment code for an agent token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EnrollRequest' }
+      responses:
+        '200':
+          description: Enrolled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnrollResult' }
+        default: { $ref: '#/components/responses/Error' }
+  /whoami:
+    get:
+      operationId: Whoami
+      responses:
+        '200':
+          description: Agent info
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AgentInfo' }
+        default: { $ref: '#/components/responses/Error' }
+  /hosts:
+    get:
+      operationId: ListHosts
+      summary: Requestable hosts
+      responses:
+        '200':
+          description: Hosts
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HostsResponse' }
+        default: { $ref: '#/components/responses/Error' }
+  /grants:
+    get:
+      operationId: ListGrants
+      summary: This agent's grants
+      parameters:
+        - name: host
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          description: Comma-separated statuses.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/GrantStatus' }
+      responses:
+        '200':
+          description: Grants, newest first
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GrantList' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      operationId: CreateGrant
+      summary: Request access to a host
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateGrantRequest' }
+      responses:
+        '200':
+          description: The new pending request, or a reused/claimed grant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreateGrantResult' }
+        default: { $ref: '#/components/responses/Error' }
+  /grants/{id}:
+    get:
+      operationId: GetGrant
+      summary: Get a grant, optionally long-polling for a change
+      parameters:
+        - $ref: '#/components/parameters/GrantID'
+        - name: wait
+          in: query
+          description: Seconds to wait for a decision while the grant (or an extension) is pending.
+          schema: { type: integer, minimum: 0, maximum: 60 }
+      responses:
+        '200':
+          description: The grant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Grant' }
+        default: { $ref: '#/components/responses/Error' }
+  /grants/{id}/claim:
+    post:
+      operationId: ClaimGrant
+      summary: Claim an admin offer with a fresh key
+      parameters:
+        - $ref: '#/components/parameters/GrantID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClaimRequest' }
+      responses:
+        '200':
+          description: The now-active grant with its certificate
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Grant' }
+        default: { $ref: '#/components/responses/Error' }
+  /grants/{id}/connect:
+    post:
+      operationId: ConnectGrant
+      summary: Report a command and fetch the current certificate (before every `lor ssh`)
+      parameters:
+        - $ref: '#/components/parameters/GrantID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConnectRequest' }
+      responses:
+        '200':
+          description: The active grant with its current certificate
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Grant' }
+        default: { $ref: '#/components/responses/Error' }
+  /grants/{id}/extend:
+    post:
+      operationId: ExtendGrant
+      summary: Ask for more time on an active grant
+      parameters:
+        - $ref: '#/components/parameters/GrantID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExtendRequest' }
+      responses:
+        '200':
+          description: The pending extension request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExtendResult' }
+        default: { $ref: '#/components/responses/Error' }
+  /grants/{id}/release:
+    post:
+      operationId: ReleaseGrant
+      summary: Give up an active grant
+      parameters:
+        - $ref: '#/components/parameters/GrantID'
+      responses:
+        '200':
+          description: The released grant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Grant' }
+        default: { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    GrantID:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Stable machine-readable code, e.g. `invalid_reason`, `grant_not_active`.
+            message: { type: string }
+    Level:
+      type: string
+      enum: [user, sudo]
+    GrantStatus:
+      type: string
+      enum: [pending, offered, active, denied, expired, released, revoked, request_timeout, offer_expired]
+    ExtensionStatus:
+      type: string
+      enum: [pending, approved, denied, request_timeout, moot]
+    EnrollRequest:
+      type: object
+      required: [code]
+      properties:
+        code: { type: string }
+    EnrollResult:
+      type: object
+      required: [token, agent]
+      properties:
+        token: { type: string }
+        agent: { $ref: '#/components/schemas/AgentInfo' }
+    AgentInfo:
+      type: object
+      required: [name, lan_addrs]
+      properties:
+        name: { type: string }
+        lan_addrs:
+          type: array
+          items: { type: string }
+    HostsResponse:
+      type: object
+      required: [hosts, agent_request_max_s, default_duration_s]
+      properties:
+        hosts:
+          type: array
+          items:
+            type: object
+            required: [name, max_level]
+            properties:
+              name: { type: string }
+              max_level: { $ref: '#/components/schemas/Level' }
+        agent_request_max_s: { type: integer, format: int64 }
+        default_duration_s: { type: integer, format: int64 }
+    CreateGrantRequest:
+      type: object
+      required: [host, level, reason, public_key]
+      properties:
+        host: { type: string }
+        level: { $ref: '#/components/schemas/Level' }
+        duration_s:
+          type: integer
+          format: int64
+          description: Defaults to `default_grant_duration` (15 minutes on `lor_infra` hosts).
+        reason:
+          type: string
+          description: 10–400 characters.
+        public_key:
+          type: string
+          description: Fresh ed25519 public key in authorized_keys format.
+    CreateGrantResult:
+      type: object
+      required: [grant]
+      properties:
+        grant: { $ref: '#/components/schemas/Grant' }
+        approval_url: { type: string }
+        reused:
+          type: boolean
+          description: An active grant at the requested level or higher already existed; the new key was not used.
+        claimed:
+          type: boolean
+          description: A matching offer existed and was claimed with the new key.
+    ClaimRequest:
+      type: object
+      required: [public_key]
+      properties:
+        public_key: { type: string }
+    ConnectRequest:
+      type: object
+      required: [argv]
+      properties:
+        argv:
+          type: array
+          description: The remote command; empty for an interactive shell.
+          items: { type: string }
+    ExtendRequest:
+      type: object
+      required: [duration_s, reason]
+      properties:
+        duration_s: { type: integer, format: int64 }
+        reason: { type: string }
+    ExtendResult:
+      type: object
+      required: [extension_request, approval_url]
+      properties:
+        extension_request: { $ref: '#/components/schemas/ExtensionRequest' }
+        approval_url: { type: string }
+        reused:
+          type: boolean
+          description: A pending extension request already existed and is returned instead.
+    GrantList:
+      type: object
+      required: [grants]
+      properties:
+        grants:
+          type: array
+          items: { $ref: '#/components/schemas/Grant' }
+    Grant:
+      type: object
+      required: [id, host, level, requested_level, status, origin, requested_at]
+      properties:
+        id: { type: integer, format: int64 }
+        host: { type: string }
+        level: { $ref: '#/components/schemas/Level' }
+        requested_level: { $ref: '#/components/schemas/Level' }
+        status: { $ref: '#/components/schemas/GrantStatus' }
+        origin:
+          type: string
+          enum: [agent_request, admin_offer]
+        reason: { type: string }
+        decision_note: { type: string }
+        requested_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time }
+        valid_after: { type: string, format: date-time }
+        valid_before:
+          type: string
+          format: date-time
+          description: Current end time (moves on extension).
+        approval_url:
+          type: string
+          description: Present while the request is pending.
+        approval_deadline:
+          type: string
+          format: date-time
+          description: When a pending request times out.
+        public_key_fp: { type: string }
+        certificate:
+          type: string
+          description: Current certificate (authorized_keys format), present when active.
+        certificate_serial: { type: integer, format: int64 }
+        ssh: { $ref: '#/components/schemas/SSHInfo' }
+        pending_extension: { $ref: '#/components/schemas/ExtensionRequest' }
+    SSHInfo:
+      type: object
+      required: [hostname, user, known_hosts_line, host_key_alias]
+      properties:
+        hostname:
+          type: string
+          description: The host's LAN IP.
+        user:
+          type: string
+          enum: [agent, agent-sudo]
+        known_hosts_line: { type: string }
+        host_key_alias: { type: string }
+    ExtensionRequest:
+      type: object
+      required: [id, grant_id, requested_duration_s, status, reason, requested_at]
+      properties:
+        id: { type: integer, format: int64 }
+        grant_id: { type: integer, format: int64 }
+        requested_duration_s: { type: integer, format: int64 }
+        approved_duration_s: { type: integer, format: int64 }
+        status: { $ref: '#/components/schemas/ExtensionStatus' }
+        reason: { type: string }
+        requested_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time }
+        decision_note: { type: string }

@@ -1,0 +1,1036 @@
+openapi: 3.0.3
+info:
+  title: Lor admin API
+  version: 1.0.0
+  description: |
+    Used only by the web UI. Served only on the admin listener, which accepts
+    connections only from `trusted_proxy` (Caddy).
+
+    Every state-changing request must carry `Origin: <public_url>`,
+    `X-Lor-Request: 1` and `Content-Type: application/json` (CSRF rules).
+    Lor never sends CORS headers.
+
+    Actions that create or extend access go through step-up
+    (`/stepup/begin` + `/stepup/finish`): the action is stored server-side
+    with a one-time WebAuthn challenge and applied exactly as stored.
+servers:
+  - url: /api/admin/v1
+security:
+  - sessionCookie: []
+paths:
+  /session:
+    get:
+      operationId: GetSession
+      security: []
+      responses:
+        '200':
+          description: Session state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionState' }
+        default: { $ref: '#/components/responses/Error' }
+  /setup/begin:
+    post:
+      operationId: SetupBegin
+      summary: Start first-passkey registration with the one-time setup code
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetupBeginRequest' }
+      responses:
+        '200':
+          description: WebAuthn creation options
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CeremonyBegin' }
+        default: { $ref: '#/components/responses/Error' }
+  /setup/finish:
+    post:
+      operationId: SetupFinish
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CeremonyFinish' }
+      responses:
+        '200':
+          description: Passkey registered and signed in
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionState' }
+        default: { $ref: '#/components/responses/Error' }
+  /login/begin:
+    post:
+      operationId: LoginBegin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: WebAuthn request options
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CeremonyBegin' }
+        default: { $ref: '#/components/responses/Error' }
+  /login/finish:
+    post:
+      operationId: LoginFinish
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CeremonyFinish' }
+      responses:
+        '200':
+          description: Signed in
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionState' }
+        default: { $ref: '#/components/responses/Error' }
+  /logout:
+    post:
+      operationId: Logout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: Signed out
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+        default: { $ref: '#/components/responses/Error' }
+  /stepup/begin:
+    post:
+      operationId: StepUpBegin
+      summary: Validate an action and get a one-time challenge bound to it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StepUpBeginRequest' }
+      responses:
+        '200':
+          description: WebAuthn request options for the step-up tap
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StepUpBegin' }
+        default: { $ref: '#/components/responses/Error' }
+  /stepup/finish:
+    post:
+      operationId: StepUpFinish
+      summary: Verify the tap and apply exactly the stored action
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CeremonyFinish' }
+      responses:
+        '200':
+          description: The action's result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StepUpResult' }
+        default: { $ref: '#/components/responses/Error' }
+  /dashboard:
+    get:
+      operationId: GetDashboard
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Dashboard' }
+        default: { $ref: '#/components/responses/Error' }
+  /grants:
+    get:
+      operationId: ListGrants
+      parameters:
+        - name: status
+          in: query
+          style: form
+          explode: false
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/GrantStatus' }
+        - name: agent_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: host_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: before
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200 }
+      responses:
+        '200':
+          description: Grants, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [grants]
+                properties:
+                  grants:
+                    type: array
+                    items: { $ref: '#/components/schemas/GrantSummary' }
+        default: { $ref: '#/components/responses/Error' }
+  /grants/{id}:
+    get:
+      operationId: GetGrant
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Grant detail, including the consent view while pending
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GrantDetail' }
+        default: { $ref: '#/components/responses/Error' }
+  /grants/{id}/deny:
+    post:
+      operationId: DenyGrant
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NoteRequest' }
+      responses:
+        '200':
+          description: Denied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GrantDetail' }
+        default: { $ref: '#/components/responses/Error' }
+  /grants/{id}/revoke:
+    post:
+      operationId: RevokeGrant
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NoteRequest' }
+      responses:
+        '200':
+          description: Revoked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GrantDetail' }
+        default: { $ref: '#/components/responses/Error' }
+  /extensions/{id}:
+    get:
+      operationId: GetExtension
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Extension request with its grant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExtensionDetail' }
+        default: { $ref: '#/components/responses/Error' }
+  /extensions/{id}/deny:
+    post:
+      operationId: DenyExtension
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NoteRequest' }
+      responses:
+        '200':
+          description: Denied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExtensionDetail' }
+        default: { $ref: '#/components/responses/Error' }
+  /hosts:
+    get:
+      operationId: ListHosts
+      responses:
+        '200':
+          description: Hosts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [hosts]
+                properties:
+                  hosts:
+                    type: array
+                    items: { $ref: '#/components/schemas/Host' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      operationId: CreateHost
+      summary: Add a host and scan its host key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/HostInput' }
+      responses:
+        '200':
+          description: The new host
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HostDetail' }
+        default: { $ref: '#/components/responses/Error' }
+  /hosts/{name}:
+    get:
+      operationId: GetHost
+      parameters:
+        - $ref: '#/components/parameters/HostName'
+      responses:
+        '200':
+          description: Host detail with fresh bootstrap one-liners
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HostDetail' }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: UpdateHost
+      parameters:
+        - $ref: '#/components/parameters/HostName'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/HostUpdate' }
+      responses:
+        '200':
+          description: The updated host
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HostDetail' }
+        default: { $ref: '#/components/responses/Error' }
+  /hosts/{name}/scan:
+    post:
+      operationId: ScanHost
+      summary: Rescan the host key. A changed key must be accepted with step-up.
+      parameters:
+        - $ref: '#/components/parameters/HostName'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: Scan result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScanResult' }
+        default: { $ref: '#/components/responses/Error' }
+  /agents:
+    get:
+      operationId: ListAgents
+      responses:
+        '200':
+          description: Agents
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agents]
+                properties:
+                  agents:
+                    type: array
+                    items: { $ref: '#/components/schemas/Agent' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      operationId: CreateAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, lan_addrs]
+              properties:
+                name: { type: string }
+                lan_addrs:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200':
+          description: The new agent and its one-time enroll command
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Enrollment' }
+        default: { $ref: '#/components/responses/Error' }
+  /agents/{id}/rotate:
+    post:
+      operationId: RotateAgentToken
+      summary: Revoke the current token and issue a new enroll command
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: New enroll command
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Enrollment' }
+        default: { $ref: '#/components/responses/Error' }
+  /agents/{id}/status:
+    post:
+      operationId: SetAgentStatus
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/AgentStatus' }
+      responses:
+        '200':
+          description: The agent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Agent' }
+        default: { $ref: '#/components/responses/Error' }
+  /audit:
+    get:
+      operationId: ListAudit
+      parameters:
+        - name: actor
+          in: query
+          schema: { type: string }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: grant_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: host_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: agent_id
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: before
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500 }
+      responses:
+        '200':
+          description: Audit events, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events]
+                properties:
+                  events:
+                    type: array
+                    items: { $ref: '#/components/schemas/AuditEvent' }
+        default: { $ref: '#/components/responses/Error' }
+  /passkeys:
+    get:
+      operationId: ListPasskeys
+      responses:
+        '200':
+          description: Passkeys
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [passkeys]
+                properties:
+                  passkeys:
+                    type: array
+                    items: { $ref: '#/components/schemas/Passkey' }
+        default: { $ref: '#/components/responses/Error' }
+  /passkeys/register/finish:
+    post:
+      operationId: PasskeyRegisterFinish
+      summary: Finish adding a passkey (after an add_passkey step-up)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CeremonyFinish' }
+      responses:
+        '200':
+          description: The new passkey
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Passkey' }
+        default: { $ref: '#/components/responses/Error' }
+  /passkeys/{id}:
+    patch:
+      operationId: RenamePasskey
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses:
+        '200':
+          description: Renamed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Passkey' }
+        default: { $ref: '#/components/responses/Error' }
+  /sessions:
+    get:
+      operationId: ListSessions
+      responses:
+        '200':
+          description: Sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessions]
+                properties:
+                  sessions:
+                    type: array
+                    items: { $ref: '#/components/schemas/Session' }
+        default: { $ref: '#/components/responses/Error' }
+  /sessions/revoke-all:
+    post:
+      operationId: RevokeAllSessions
+      summary: Sign out everywhere, including this session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: All sessions deleted
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ok' }
+        default: { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-lor_session
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    HostName:
+      name: name
+      in: path
+      required: true
+      schema: { type: string }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+    Ok:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+    Level:
+      type: string
+      enum: [user, sudo]
+    AgentStatus:
+      type: string
+      enum: [active, disabled]
+    GrantStatus:
+      type: string
+      enum: [pending, offered, active, denied, expired, released, revoked, request_timeout, offer_expired]
+    ExtensionStatus:
+      type: string
+      enum: [pending, approved, denied, request_timeout, moot]
+    WebAuthnOptions:
+      type: object
+      additionalProperties: true
+      description: PublicKeyCredentialCreationOptionsJSON or PublicKeyCredentialRequestOptionsJSON.
+      x-go-type: json.RawMessage
+    WebAuthnCredential:
+      type: object
+      additionalProperties: true
+      description: RegistrationResponseJSON or AuthenticationResponseJSON from @simplewebauthn/browser.
+      x-go-type: json.RawMessage
+    SessionState:
+      type: object
+      required: [authenticated, setup_required]
+      properties:
+        authenticated: { type: boolean }
+        setup_required:
+          type: boolean
+          description: No passkey is registered yet; use /setup.
+        passkey_name: { type: string }
+        config: { $ref: '#/components/schemas/UIConfig' }
+    UIConfig:
+      type: object
+      required: [public_url, default_grant_duration_s, agent_request_max_s, absolute_max_duration_s, request_approval_timeout_s]
+      properties:
+        public_url: { type: string }
+        default_grant_duration_s: { type: integer, format: int64 }
+        agent_request_max_s: { type: integer, format: int64 }
+        absolute_max_duration_s: { type: integer, format: int64 }
+        request_approval_timeout_s: { type: integer, format: int64 }
+    SetupBeginRequest:
+      type: object
+      required: [code, passkey_name]
+      properties:
+        code: { type: string }
+        passkey_name: { type: string }
+    CeremonyBegin:
+      type: object
+      required: [ceremony_id, options]
+      properties:
+        ceremony_id: { type: string }
+        options: { $ref: '#/components/schemas/WebAuthnOptions' }
+    CeremonyFinish:
+      type: object
+      required: [ceremony_id, credential]
+      properties:
+        ceremony_id: { type: string }
+        credential: { $ref: '#/components/schemas/WebAuthnCredential' }
+    StepUpKind:
+      type: string
+      enum:
+        - authorize_request
+        - approve_extension
+        - create_offer
+        - extend_grant
+        - set_agent_addrs
+        - accept_host_key
+        - add_passkey
+        - remove_passkey
+    StepUpAction:
+      type: object
+      description: |
+        The exact action to apply after the tap. Which fields are used depends on `kind`:
+        - authorize_request: grant_id, level, duration_s, confirm_sudo
+        - approve_extension: extension_id, duration_s
+        - create_offer: agent_id, host_id, level, duration_s, confirm_sudo, note
+        - extend_grant: grant_id, duration_s
+        - set_agent_addrs: agent_id, lan_addrs
+        - accept_host_key: host_id, host_key
+        - add_passkey: passkey_name
+        - remove_passkey: passkey_id
+      required: [kind]
+      properties:
+        kind: { $ref: '#/components/schemas/StepUpKind' }
+        grant_id: { type: integer, format: int64 }
+        extension_id: { type: integer, format: int64 }
+        agent_id: { type: integer, format: int64 }
+        host_id: { type: integer, format: int64 }
+        passkey_id: { type: integer, format: int64 }
+        level: { $ref: '#/components/schemas/Level' }
+        duration_s: { type: integer, format: int64 }
+        confirm_sudo: { type: boolean }
+        note: { type: string }
+        lan_addrs:
+          type: array
+          items: { type: string }
+        host_key: { type: string }
+        passkey_name: { type: string }
+    StepUpBeginRequest:
+      type: object
+      required: [action]
+      properties:
+        action: { $ref: '#/components/schemas/StepUpAction' }
+    StepUpBegin:
+      type: object
+      required: [ceremony_id, options, summary, expires_at]
+      properties:
+        ceremony_id: { type: string }
+        options: { $ref: '#/components/schemas/WebAuthnOptions' }
+        summary:
+          type: string
+          description: Server-side restatement of the stored action.
+        expires_at: { type: string, format: date-time }
+    StepUpResult:
+      type: object
+      required: [kind]
+      properties:
+        kind: { $ref: '#/components/schemas/StepUpKind' }
+        grant: { $ref: '#/components/schemas/GrantDetail' }
+        extension: { $ref: '#/components/schemas/ExtensionDetail' }
+        offer_message:
+          type: string
+          description: Text to paste into chat after creating an offer.
+        agent: { $ref: '#/components/schemas/Agent' }
+        host: { $ref: '#/components/schemas/HostDetail' }
+        registration:
+          $ref: '#/components/schemas/CeremonyBegin'
+        passkey_removed: { type: boolean }
+    Warning:
+      type: object
+      description: Computed by the server. The UI shows those whose `levels` include the selected level.
+      required: [code, severity, levels, title, message]
+      properties:
+        code: { type: string }
+        severity:
+          type: string
+          enum: [danger, warning, info]
+        levels:
+          type: array
+          items: { $ref: '#/components/schemas/Level' }
+        title: { type: string }
+        message: { type: string }
+    AgentRef:
+      type: object
+      required: [id, name, lan_addrs]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        lan_addrs:
+          type: array
+          items: { type: string }
+    HostRef:
+      type: object
+      required: [id, name, address, max_level, hypervisor, lor_infra]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        address: { type: string }
+        max_level: { $ref: '#/components/schemas/Level' }
+        hypervisor: { type: boolean }
+        lor_infra: { type: boolean }
+    CommandEntry:
+      type: object
+      required: [id, argv, reported_at]
+      properties:
+        id: { type: integer, format: int64 }
+        argv:
+          type: array
+          description: Empty for an interactive shell.
+          items: { type: string }
+        reported_at: { type: string, format: date-time }
+        certificate_id: { type: integer, format: int64 }
+    GrantSummary:
+      type: object
+      required: [id, agent, host, origin, level, requested_level, status, reason, requested_at]
+      properties:
+        id: { type: integer, format: int64 }
+        agent: { $ref: '#/components/schemas/AgentRef' }
+        host: { $ref: '#/components/schemas/HostRef' }
+        origin:
+          type: string
+          enum: [agent_request, admin_offer]
+        level: { $ref: '#/components/schemas/Level' }
+        requested_level: { $ref: '#/components/schemas/Level' }
+        requested_duration_s: { type: integer, format: int64 }
+        approved_duration_s: { type: integer, format: int64 }
+        status: { $ref: '#/components/schemas/GrantStatus' }
+        reason:
+          type: string
+          description: Written by the agent (or the admin's note on an offer). Unverified; render as plain text.
+        decision_note: { type: string }
+        decided_by: { type: string }
+        requested_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time }
+        valid_after: { type: string, format: date-time }
+        valid_before: { type: string, format: date-time }
+        ended_at: { type: string, format: date-time }
+        approval_deadline: { type: string, format: date-time }
+        last_command: { $ref: '#/components/schemas/CommandEntry' }
+        pending_extension: { $ref: '#/components/schemas/Extension' }
+    Consent:
+      type: object
+      description: Present only while a request is pending.
+      required: [levels, default_level, default_duration_s, approval_deadline, limits]
+      properties:
+        levels:
+          type: array
+          description: Levels the admin may choose (never above the requested level).
+          items: { $ref: '#/components/schemas/Level' }
+        default_level: { $ref: '#/components/schemas/Level' }
+        default_duration_s: { type: integer, format: int64 }
+        approval_deadline: { type: string, format: date-time }
+        limits:
+          type: array
+          items: { type: string }
+    Actions:
+      type: object
+      description: What the admin can do now. A decided request never has `authorize`.
+      required: [authorize, deny, extend, revoke]
+      properties:
+        authorize: { type: boolean }
+        deny: { type: boolean }
+        extend: { type: boolean }
+        revoke: { type: boolean }
+    CertificateInfo:
+      type: object
+      required: [id, valid_after, valid_before, issued_at, issued_by]
+      properties:
+        id: { type: integer, format: int64 }
+        valid_after: { type: string, format: date-time }
+        valid_before: { type: string, format: date-time }
+        issued_at: { type: string, format: date-time }
+        issued_by: { type: string }
+    Extension:
+      type: object
+      required: [id, grant_id, requested_duration_s, status, reason, requested_at]
+      properties:
+        id: { type: integer, format: int64 }
+        grant_id: { type: integer, format: int64 }
+        requested_duration_s: { type: integer, format: int64 }
+        approved_duration_s: { type: integer, format: int64 }
+        status: { $ref: '#/components/schemas/ExtensionStatus' }
+        reason:
+          type: string
+          description: Written by the agent. Unverified; render as plain text.
+        requested_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time }
+        decided_by: { type: string }
+        decision_note: { type: string }
+    GrantDetail:
+      allOf:
+        - $ref: '#/components/schemas/GrantSummary'
+        - type: object
+          required: [warnings, actions, certificates, commands, extensions, timeline, public_key_fp]
+          properties:
+            warnings:
+              type: array
+              items: { $ref: '#/components/schemas/Warning' }
+            actions: { $ref: '#/components/schemas/Actions' }
+            consent: { $ref: '#/components/schemas/Consent' }
+            public_key_fp: { type: string }
+            certificates:
+              type: array
+              items: { $ref: '#/components/schemas/CertificateInfo' }
+            commands:
+              type: array
+              description: Reported by the agent's CLI (self-reported, newest first).
+              items: { $ref: '#/components/schemas/CommandEntry' }
+            extensions:
+              type: array
+              items: { $ref: '#/components/schemas/Extension' }
+            timeline:
+              type: array
+              items: { $ref: '#/components/schemas/AuditEvent' }
+    ExtensionDetail:
+      type: object
+      required: [extension, grant, actions]
+      properties:
+        extension: { $ref: '#/components/schemas/Extension' }
+        grant: { $ref: '#/components/schemas/GrantDetail' }
+        current_end: { type: string, format: date-time }
+        would_end:
+          type: string
+          format: date-time
+          description: End time if approved with the requested duration.
+        actions:
+          type: object
+          required: [approve, deny]
+          properties:
+            approve: { type: boolean }
+            deny: { type: boolean }
+    Dashboard:
+      type: object
+      required: [pending_requests, pending_extensions, active, offered, recent_audit, server_time]
+      properties:
+        pending_requests:
+          type: array
+          items: { $ref: '#/components/schemas/GrantSummary' }
+        pending_extensions:
+          type: array
+          items:
+            type: object
+            required: [extension, grant]
+            properties:
+              extension: { $ref: '#/components/schemas/Extension' }
+              grant: { $ref: '#/components/schemas/GrantSummary' }
+        active:
+          type: array
+          items: { $ref: '#/components/schemas/GrantSummary' }
+        offered:
+          type: array
+          items: { $ref: '#/components/schemas/GrantSummary' }
+        recent_audit:
+          type: array
+          items: { $ref: '#/components/schemas/AuditEvent' }
+        server_time: { type: string, format: date-time }
+    Host:
+      type: object
+      required: [id, name, address, max_level, hypervisor, lor_infra, notes, disabled, created_at, warnings]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        address: { type: string }
+        host_key: { type: string }
+        host_key_fingerprint: { type: string }
+        host_key_seen_at: { type: string, format: date-time }
+        max_level: { $ref: '#/components/schemas/Level' }
+        hypervisor: { type: boolean }
+        lor_infra: { type: boolean }
+        notes: { type: string }
+        disabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+        warnings:
+          type: array
+          items: { $ref: '#/components/schemas/Warning' }
+    HostDetail:
+      type: object
+      required: [host, bootstrap]
+      properties:
+        host: { $ref: '#/components/schemas/Host' }
+        scan_error:
+          type: string
+          description: Set when the automatic host-key scan failed.
+        bootstrap: { $ref: '#/components/schemas/Bootstrap' }
+    Bootstrap:
+      type: object
+      required: [install, install_no_sudo, uninstall, expires_at]
+      properties:
+        install: { type: string }
+        install_no_sudo: { type: string }
+        uninstall: { type: string }
+        expires_at: { type: string, format: date-time }
+    HostInput:
+      type: object
+      required: [name, address, max_level]
+      properties:
+        name: { type: string }
+        address: { type: string }
+        max_level: { $ref: '#/components/schemas/Level' }
+        hypervisor: { type: boolean }
+        lor_infra: { type: boolean }
+        notes: { type: string }
+    HostUpdate:
+      type: object
+      properties:
+        address: { type: string }
+        max_level: { $ref: '#/components/schemas/Level' }
+        hypervisor: { type: boolean }
+        lor_infra: { type: boolean }
+        notes: { type: string }
+        disabled: { type: boolean }
+    ScanResult:
+      type: object
+      required: [host_key, fingerprint, changed]
+      properties:
+        host_key: { type: string }
+        fingerprint: { type: string }
+        changed:
+          type: boolean
+          description: The key differs from the stored one. Accept it with an accept_host_key step-up.
+        previous_fingerprint: { type: string }
+        host: { $ref: '#/components/schemas/Host' }
+    Agent:
+      type: object
+      required: [id, name, status, lan_addrs, enrolled, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        status: { $ref: '#/components/schemas/AgentStatus' }
+        lan_addrs:
+          type: array
+          items: { type: string }
+        enrolled: { type: boolean }
+        token_created_at: { type: string, format: date-time }
+        enroll_code_expires_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        last_seen_at: { type: string, format: date-time }
+    Enrollment:
+      type: object
+      required: [agent, command, expires_at]
+      properties:
+        agent: { $ref: '#/components/schemas/Agent' }
+        command:
+          type: string
+          description: One-time `lor enroll …` command to run in the agent LXC.
+        expires_at: { type: string, format: date-time }
+    AuditEvent:
+      type: object
+      required: [id, ts, actor, action, details]
+      properties:
+        id: { type: integer, format: int64 }
+        ts: { type: string, format: date-time }
+        actor: { type: string }
+        action: { type: string }
+        grant_id: { type: integer, format: int64 }
+        host_id: { type: integer, format: int64 }
+        agent_id: { type: integer, format: int64 }
+        details:
+          type: object
+          additionalProperties: true
+    Passkey:
+      type: object
+      required: [id, name, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        created_at: { type: string, format: date-time }
+        last_used_at: { type: string, format: date-time }
+    Session:
+      type: object
+      required: [id, created_at, last_seen_at, expires_at, user_agent, current]
+      properties:
+        id: { type: integer, format: int64 }
+        passkey_name: { type: string }
+        created_at: { type: string, format: date-time }
+        last_seen_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        user_agent: { type: string }
+        forwarded_for: { type: string }
+        current: { type: boolean }
+    NoteRequest:
+      type: object
+      properties:
+        note: { type: string }
