@@ -9,13 +9,15 @@ import (
 
 func TestParseDuration(t *testing.T) {
 	cases := map[string]time.Duration{
-		"90d":   90 * 24 * time.Hour,
-		"1w":    7 * 24 * time.Hour,
-		"1w2d":  9 * 24 * time.Hour,
-		"720h":  720 * time.Hour,
-		"1h30m": 90 * time.Minute,
-		"1d12h": 36 * time.Hour,
-		"15m":   15 * time.Minute,
+		"90d":    90 * 24 * time.Hour,
+		"1w":     7 * 24 * time.Hour,
+		"1w2d":   9 * 24 * time.Hour,
+		"720h":   720 * time.Hour,
+		"1h30m":  90 * time.Minute,
+		"1d12h":  36 * time.Hour,
+		"15m":    15 * time.Minute,
+		"1.5h":   90 * time.Minute,
+		"2d1.5h": 49*time.Hour + 30*time.Minute,
 	}
 	for in, want := range cases {
 		got, err := ParseDuration(in)
@@ -23,7 +25,7 @@ func TestParseDuration(t *testing.T) {
 			t.Errorf("ParseDuration(%q) = %v, %v; want %v", in, got, err, want)
 		}
 	}
-	for _, bad := range []string{"", "d", "1x", "-1h", "h1"} {
+	for _, bad := range []string{"", "d", "1x", "-1h", "h1", "213504d", "1.5d", "999999999999w", "106751d106751d"} {
 		if _, err := ParseDuration(bad); err == nil {
 			t.Errorf("ParseDuration(%q) should fail", bad)
 		}
@@ -67,6 +69,9 @@ agent_listen = "192.168.1.10:8443"
 		"unknown key":       base + `public_url = "https://lor.example.com"` + "\ntrusted_proxy = \"192.168.1.30\"\ndev = true",
 		"agent max > abs":   base + `public_url = "https://lor.example.com"` + "\ntrusted_proxy = \"192.168.1.30\"\nagent_request_max = \"1000h\"",
 		"public url w/path": base + `public_url = "https://lor.example.com/lor"` + "\ntrusted_proxy = \"192.168.1.30\"",
+		"public url frag":   base + `public_url = "https://lor.example.com/#admin"` + "\ntrusted_proxy = \"192.168.1.30\"",
+		"public url query":  base + `public_url = "https://lor.example.com/?x=1"` + "\ntrusted_proxy = \"192.168.1.30\"",
+		"public url user":   base + `public_url = "https://a@lor.example.com"` + "\ntrusted_proxy = \"192.168.1.30\"",
 	}
 	for name, content := range cases {
 		p := filepath.Join(t.TempDir(), "c.toml")

@@ -361,7 +361,7 @@ func (s *Service) issue(ctx context.Context, tx *store.Tx, g *store.Grant, valid
 }
 
 func (s *Service) checkAbsoluteMax(validBefore int64) error {
-	if time.Unix(validBefore, 0).Sub(s.now()) > s.cfg.AbsoluteMax {
+	if time.Unix(validBefore, 0).After(s.now().Add(s.cfg.AbsoluteMax)) {
 		return apierr.BadRequest("duration_too_long", "the end time would be more than %s from now", formatDuration(s.cfg.AbsoluteMax))
 	}
 	return nil

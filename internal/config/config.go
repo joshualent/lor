@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"net/netip"
 	"net/url"
@@ -32,43 +33,69 @@ func (d *Duration) UnmarshalText(b []byte) error {
 // D returns the duration as a time.Duration.
 func (d Duration) D() time.Duration { return time.Duration(d) }
 
-// ParseDuration parses Go durations plus "d" and "w" units.
+// ParseDuration parses Go durations ("1.5h", "90m") plus "d" and "w" units
+// ("90d", "1w2d", "1d12h"). Overflow is an error, not a wraparound.
 func ParseDuration(s string) (time.Duration, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return 0, errors.New("empty duration")
 	}
+	if !strings.ContainsAny(s, "dw") {
+		d, err := time.ParseDuration(s)
+		if err != nil || d < 0 {
+			return 0, fmt.Errorf("invalid duration %q", s)
+		}
+		return d, nil
+	}
+	const maxDur = time.Duration(math.MaxInt64)
 	var total time.Duration
+	add := func(d time.Duration) error {
+		if d < 0 || total > maxDur-d {
+			return fmt.Errorf("duration %q is too large", s)
+		}
+		total += d
+		return nil
+	}
 	rest := s
 	for rest != "" {
 		i := 0
-		for i < len(rest) && (rest[i] >= '0' && rest[i] <= '9') {
+		for i < len(rest) && (rest[i] >= '0' && rest[i] <= '9' || rest[i] == '.') {
 			i++
 		}
 		if i == 0 {
-			// Not a d/w prefix; hand the remainder to time.ParseDuration.
 			return 0, fmt.Errorf("invalid duration %q", s)
 		}
 		j := i
-		for j < len(rest) && !(rest[j] >= '0' && rest[j] <= '9') {
+		for j < len(rest) && !(rest[j] >= '0' && rest[j] <= '9' || rest[j] == '.') {
 			j++
 		}
 		num, unit := rest[:i], rest[i:j]
-		n, err := strconv.ParseInt(num, 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("invalid duration %q", s)
-		}
+		var unitDur time.Duration
 		switch unit {
 		case "d":
-			total += time.Duration(n) * 24 * time.Hour
+			unitDur = 24 * time.Hour
 		case "w":
-			total += time.Duration(n) * 7 * 24 * time.Hour
+			unitDur = 7 * 24 * time.Hour
 		default:
 			v, err := time.ParseDuration(num + unit)
-			if err != nil {
+			if err != nil || v < 0 {
 				return 0, fmt.Errorf("invalid duration %q", s)
 			}
-			total += v
+			if err := add(v); err != nil {
+				return 0, err
+			}
+			rest = rest[j:]
+			continue
+		}
+		n, err := strconv.ParseInt(num, 10, 64)
+		if err != nil || n < 0 {
+			return 0, fmt.Errorf("invalid duration %q (d and w take whole numbers)", s)
+		}
+		if n > int64(maxDur/unitDur) {
+			return 0, fmt.Errorf("duration %q is too large", s)
+		}
+		if err := add(time.Duration(n) * unitDur); err != nil {
+			return 0, err
 		}
 		rest = rest[j:]
 	}
@@ -146,8 +173,11 @@ func (c *Config) Finish() error {
 	if u.Path != "" && u.Path != "/" {
 		return errors.New("config: public_url must not have a path")
 	}
-	c.PublicURL = strings.TrimSuffix(c.PublicURL, "/")
+	if u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || strings.Contains(c.PublicURL, "#") {
+		return errors.New("config: public_url must be just scheme and host (no user info, query or fragment)")
+	}
 	c.PublicOrigin = u.Scheme + "://" + u.Host
+	c.PublicURL = c.PublicOrigin
 	c.RPID = u.Hostname()
 
 	if c.AdminListen == "" || c.AgentListen == "" {

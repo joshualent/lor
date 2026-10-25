@@ -303,6 +303,30 @@ func TestCertParsesWithSSHKeygen(t *testing.T) {
 	}
 }
 
+// time.Sub saturates; a huge absolute max must not let year-9999 certs through.
+func TestAbsoluteMaxNoSaturation(t *testing.T) {
+	_, priv, _ := ed25519.GenerateKey(rand.Reader)
+	s, _ := ssh.NewSignerFromKey(priv)
+	c, err := New(s, WithClock(func() time.Time { return testNow }), WithAbsoluteMax(time.Duration(1<<63-1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := validRequest(t)
+	req.ValidBefore = time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
+	if _, err := c.SignUserCert(req); !errors.Is(err, ErrRefused) {
+		t.Fatalf("expected refusal, got %v", err)
+	}
+}
+
+func TestLoadOrGenerateIgnoresStaleTemp(t *testing.T) {
+	dir := t.TempDir()
+	// A leftover temp file from a crash doesn't matter.
+	os.WriteFile(filepath.Join(dir, ".lor_ca.tmp-123"), []byte("partial"), 0o600)
+	if _, created, err := LoadOrGenerate(dir); err != nil || !created {
+		t.Fatalf("created=%v err=%v", created, err)
+	}
+}
+
 func TestLoadOrGenerate(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "ca")
 	c1, created, err := LoadOrGenerate(dir)

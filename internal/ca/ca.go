@@ -116,21 +116,38 @@ func LoadOrGenerate(dir string, opts ...Option) (c *CA, created bool, err error)
 	if err != nil {
 		return nil, false, err
 	}
-	// O_EXCL so two processes can't both generate a key.
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	// Write a complete temp file first, then publish it with link(2), which
+	// fails instead of replacing if another process won the race. A crash
+	// can never leave a truncated lor_ca behind.
+	tmp, err := os.CreateTemp(dir, ".lor_ca.tmp-*")
 	if err != nil {
 		return nil, false, fmt.Errorf("ca: create key: %w", err)
 	}
-	if _, err := f.Write(pem.EncodeToMemory(block)); err != nil {
-		f.Close()
+	defer os.Remove(tmp.Name())
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()
 		return nil, false, err
 	}
-	if err := f.Sync(); err != nil {
-		f.Close()
+	if _, err := tmp.Write(pem.EncodeToMemory(block)); err != nil {
+		tmp.Close()
 		return nil, false, err
 	}
-	if err := f.Close(); err != nil {
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
 		return nil, false, err
+	}
+	if err := tmp.Close(); err != nil {
+		return nil, false, err
+	}
+	if err := os.Link(tmp.Name(), path); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return LoadOrGenerate(dir, opts...)
+		}
+		return nil, false, fmt.Errorf("ca: publish key: %w", err)
+	}
+	if d, err := os.Open(dir); err == nil {
+		d.Sync()
+		d.Close()
 	}
 	signer, err := ssh.NewSignerFromKey(priv)
 	if err != nil {
@@ -200,7 +217,7 @@ func (c *CA) SignUserCert(req UserCertRequest) (*ssh.Certificate, error) {
 	if !req.ValidBefore.After(now) {
 		return nil, refuse("valid-before must be in the future")
 	}
-	if req.ValidBefore.Sub(now) > c.absoluteMax {
+	if req.ValidBefore.After(now.Add(c.absoluteMax)) {
 		return nil, refuse("valid-before is more than %s from now", c.absoluteMax)
 	}
 	if req.ValidAfter.IsZero() {
@@ -274,7 +291,7 @@ func CheckCert(cert *ssh.Certificate, now time.Time, absoluteMax time.Duration) 
 	if !vb.After(now) {
 		return refuse("valid-before must be in the future")
 	}
-	if vb.Sub(now) > absoluteMax {
+	if vb.After(now.Add(absoluteMax)) {
 		return refuse("valid-before is more than %s from now", absoluteMax)
 	}
 	if cert.ValidAfter >= cert.ValidBefore {
