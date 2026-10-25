@@ -1,0 +1,13 @@
+/bin/
+/dist/
+*.test
+*.out
+/coverage*
+/.dev-data/
+/test/e2e/.tmp/
+web/node_modules/
+web/.svelte-kit/
+web/test-results/
+web/playwright-report/
+.DS_Store
+web/build/
