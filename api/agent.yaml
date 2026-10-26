@@ -344,11 +344,12 @@ components:
         pending_extension: { $ref: '#/components/schemas/ExtensionRequest' }
     SSHInfo:
       type: object
-      required: [hostname, user, known_hosts_line, host_key_alias]
+      required: [hostname, port, user, known_hosts_line, host_key_alias]
       properties:
         hostname:
           type: string
           description: The host's LAN IP.
+        port: { type: integer }
         user:
           type: string
           enum: [agent, agent-sudo]

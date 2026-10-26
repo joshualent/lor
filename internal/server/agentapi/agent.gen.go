@@ -292,6 +292,7 @@ type SSHInfo struct {
 	// Hostname The host's LAN IP.
 	Hostname       string      `json:"hostname"`
 	KnownHostsLine string      `json:"known_hosts_line"`
+	Port           int         `json:"port"`
 	User           SSHInfoUser `json:"user"`
 }
 
