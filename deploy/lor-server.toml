@@ -1,0 +1,12 @@
+# /etc/lor/lor-server.toml (plan section 15)
+data_dir = "/var/lib/lor"
+public_url = "https://lor.home.example.com"  # Caddy site: approval links, passkey RP ID, Origin check
+admin_listen = "192.168.1.10:8444"           # admin API + web UI; Caddy only
+trusted_proxy = "192.168.1.30"               # Caddy LXC's LAN IP
+agent_listen = "192.168.1.10:8443"           # agent API; agents connect directly
+default_grant_duration = "1h"
+agent_request_max = "8h"                     # agents can't ask for more; admin can grant more
+absolute_max_duration = "720h"               # bug guard in the ca package
+request_approval_timeout = "30m"
+command_log_retention = "90d"
+# tls_extra_sans = ["lor.lan"]               # optional extra names/IPs for the self-signed cert

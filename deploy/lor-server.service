@@ -1,0 +1,34 @@
+[Unit]
+Description=Lor: temporary, approved SSH access for AI agents
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lor
+Group=lor
+ExecStart=/usr/local/bin/lor-server serve --config /etc/lor/lor-server.toml
+Restart=on-failure
+RestartSec=2s
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+StateDirectory=lor
+StateDirectoryMode=0700
+ReadWritePaths=/var/lib/lor
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

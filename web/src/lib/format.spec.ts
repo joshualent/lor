@@ -46,10 +46,10 @@ describe('formatAgo', () => {
 });
 
 describe('formatArgv', () => {
-	it('quotes like a shell', () => {
+	it('shows what the remote shell runs (arguments joined by spaces, like ssh)', () => {
 		expect(formatArgv(['zpool', 'status', '-v'])).toBe('zpool status -v');
-		expect(formatArgv(['bash', '-c', "echo 'hi' && ls"])).toBe(`bash -c 'echo '\\''hi'\\'' && ls'`);
+		expect(formatArgv(['zpool status | head'])).toBe('zpool status | head');
+		expect(formatArgv(['<script>'])).toBe('<script>');
 		expect(formatArgv([])).toBe('(interactive shell)');
-		expect(formatArgv(['<script>'])).toBe("'<script>'");
 	});
 });

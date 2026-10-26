@@ -257,6 +257,7 @@ func TestIntegration(t *testing.T) {
 			t.Fatalf("request: %d\n%s\n%s", code, out, errOut)
 		}
 		id := linkRe.FindStringSubmatch(out)[1]
+		defer e.lor("release", "nas")
 		e.stepUp(map[string]any{"kind": "authorize_request", "grant_id": atoi(id), "level": "user", "duration_s": 600})
 		out, errOut, code = e.lor("ssh", "nas", "--", "id", "-un")
 		if code != 0 || strings.TrimSpace(out) != "agent" {
@@ -274,19 +275,16 @@ func TestIntegration(t *testing.T) {
 		if code != 0 || strings.TrimSpace(out) != "nas" {
 			t.Fatalf("config-path ssh: %d %q %s", code, out, errOut)
 		}
-		if _, _, code := e.lor("release", "nas"); code != 0 {
-			t.Fatal("release failed")
-		}
 	})
 
 	// ---- 13. Offer flow.
 	t.Run("13_offer_flow", func(t *testing.T) {
 		e.stepUp(map[string]any{"kind": "create_offer", "agent_id": agentID, "host_id": hostIDs["pihole"], "level": "user", "duration_s": 600})
+		defer e.lor("release", "pihole")
 		out, errOut, code := e.lor("ssh", "pihole", "--", "hostname")
 		if code != 0 || strings.TrimSpace(out) != "pihole" || !strings.Contains(errOut, "claimed the offer") {
 			t.Fatalf("offer claim: %d %q %s", code, out, errOut)
 		}
-		e.lor("release", "pihole")
 	})
 
 	// ---- 14. Downgrade: sudo requested, user approved.
@@ -296,6 +294,7 @@ func TestIntegration(t *testing.T) {
 			t.Fatalf("request: %d %s %s", code, out, errOut)
 		}
 		id := linkRe.FindStringSubmatch(out)[1]
+		defer e.lor("release", "nas")
 		e.stepUp(map[string]any{"kind": "authorize_request", "grant_id": atoi(id), "level": "user", "duration_s": 600})
 		out, _, code = e.lor("ssh", "nas", "--", "id", "-un")
 		if code != 0 || strings.TrimSpace(out) != "agent" {
@@ -304,13 +303,13 @@ func TestIntegration(t *testing.T) {
 		if _, _, code := e.lor("ssh", "nas", "--", "sudo", "-n", "true"); code == 0 {
 			t.Fatal("sudo worked after a downgrade")
 		}
-		e.lor("release", "nas")
 	})
 
 	// ---- 16. Revoked grant: lor ssh deletes the key and refuses.
 	t.Run("16_revoked", func(t *testing.T) {
 		res := e.stepUp(map[string]any{"kind": "create_offer", "agent_id": agentID, "host_id": hostIDs["nas"], "level": "sudo", "duration_s": 600, "confirm_sudo": true})
 		gid := int64(res["grant"].(map[string]any)["id"].(float64))
+		defer e.lor("release", "nas")
 		if out, errOut, code := e.lor("ssh", "nas", "--", "sudo", "-n", "id", "-u"); code != 0 || strings.TrimSpace(out) != "0" {
 			t.Fatalf("sudo grant: %d %q %s", code, out, errOut)
 		}
@@ -327,13 +326,18 @@ func TestIntegration(t *testing.T) {
 	// ---- 17. Exit codes.
 	t.Run("17_exit_codes", func(t *testing.T) {
 		e.stepUp(map[string]any{"kind": "create_offer", "agent_id": agentID, "host_id": hostIDs["nas"], "level": "user", "duration_s": 600})
-		if _, _, code := e.lor("ssh", "nas", "--", "sh", "-c", "exit 7"); code != 7 {
+		defer e.lor("release", "nas")
+		// Like ssh, the arguments are joined with spaces and run by the
+		// remote shell.
+		if _, _, code := e.lor("ssh", "nas", "--", "exit 7"); code != 7 {
 			t.Fatalf("remote exit code: got %d, want 7", code)
+		}
+		if _, _, code := e.lor("ssh", "nas", "--", "sh", "-c", "'exit 3'"); code != 3 {
+			t.Fatalf("remote exit code: got %d, want 3", code)
 		}
 		if _, errOut, code := e.lor("ssh", "nohost", "--", "true"); code != 255 || !strings.HasPrefix(errOut, "lor: ") {
 			t.Fatalf("lor-side failure: %d %q", code, errOut)
 		}
-		e.lor("release", "nas")
 	})
 
 	// ---- 15. Extension in the last 30s keeps access past the original end;
@@ -341,6 +345,7 @@ func TestIntegration(t *testing.T) {
 	t.Run("15_extension_in_last_30s", func(t *testing.T) {
 		res := e.stepUp(map[string]any{"kind": "create_offer", "agent_id": agentID, "host_id": hostIDs["nas"], "level": "user", "duration_s": 75})
 		start := time.Now()
+		defer e.lor("release", "nas")
 		gid := int64(res["grant"].(map[string]any)["id"].(float64))
 		res2 := e.stepUp(map[string]any{"kind": "create_offer", "agent_id": agentID, "host_id": hostIDs["pihole"], "level": "user", "duration_s": 75})
 		gid2 := int64(res2["grant"].(map[string]any)["id"].(float64))
@@ -378,7 +383,6 @@ func TestIntegration(t *testing.T) {
 			t.Fatal("expired certificate accepted by sshd")
 		}
 		t.Logf("raw ssh with expired cert: exit %d (%s)", code, strings.TrimSpace(errOut))
-		e.lor("release", "nas")
 	})
 }
 

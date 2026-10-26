@@ -1,0 +1,9 @@
+# Caddy site for Lor's web UI (on the Caddy LXC). Copy <data_dir>/tls/cert.pem
+# from the Lor LXC to /etc/caddy/lor.crt first.
+lor.home.example.com {
+	reverse_proxy https://192.168.1.10:8444 {
+		transport http {
+			tls_trust_pool file /etc/caddy/lor.crt
+		}
+	}
+}

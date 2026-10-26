@@ -82,12 +82,12 @@ export function formatTimestamp(ms: number): string {
 	});
 }
 
-/** Renders an argv the way a shell would show it. [] is an interactive shell. */
+/**
+ * Renders a reported command. Like ssh, `lor ssh` joins the arguments with
+ * spaces and the remote shell runs the result, so that's what is shown.
+ * [] is an interactive shell.
+ */
 export function formatArgv(argv: string[]): string {
 	if (argv.length === 0) return '(interactive shell)';
-	return argv
-		.map((a) =>
-			a === '' ? "''" : /^[\w@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, `'\\''`)}'`
-		)
-		.join(' ');
+	return argv.join(' ');
 }

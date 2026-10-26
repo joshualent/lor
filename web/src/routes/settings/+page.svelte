@@ -158,9 +158,12 @@
 				</li>
 			{/each}
 		</ul>
-		<Button variant="destructive" class="mt-4" onclick={() => (everywhereOpen = true)}
-			>Sign out everywhere</Button
-		>
+		<div class="mt-4 flex flex-wrap gap-2">
+			<Button variant="secondary" onclick={signOut}>Sign out</Button>
+			<Button variant="destructive" onclick={() => (everywhereOpen = true)}
+				>Sign out everywhere</Button
+			>
+		</div>
 	</Section>
 </div>
 
