@@ -137,6 +137,27 @@ func (e GrantSummaryOrigin) Valid() bool {
 	}
 }
 
+// Defines values for HostIdleTimeout.
+const (
+	Enforced   HostIdleTimeout = "enforced"
+	Unenforced HostIdleTimeout = "unenforced"
+	Unknown    HostIdleTimeout = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the HostIdleTimeout enum.
+func (e HostIdleTimeout) Valid() bool {
+	switch e {
+	case Enforced:
+		return true
+	case Unenforced:
+		return true
+	case Unknown:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Level.
 const (
 	Sudo Level = "sudo"
@@ -455,12 +476,21 @@ type Host struct {
 	HostKeySeenAt      *time.Time `json:"host_key_seen_at,omitempty"`
 	Hypervisor         bool       `json:"hypervisor"`
 	Id                 int64      `json:"id"`
-	LorInfra           bool       `json:"lor_infra"`
-	MaxLevel           Level      `json:"max_level"`
-	Name               string     `json:"name"`
-	Notes              string     `json:"notes"`
-	Warnings           []Warning  `json:"warnings"`
+
+	// IdleTimeout Whether sshd enforces Lor's 15-minute idle timeout (OpenSSH 10.5+ applies ChannelTimeout in Match blocks).
+	IdleTimeout HostIdleTimeout `json:"idle_timeout"`
+	LorInfra    bool            `json:"lor_infra"`
+	MaxLevel    Level           `json:"max_level"`
+	Name        string          `json:"name"`
+	Notes       string          `json:"notes"`
+
+	// SshVersion SSH software the host reported at its last scan, e.g. "OpenSSH_10.2p1 Ubuntu-2ubuntu3.8".
+	SshVersion *string   `json:"ssh_version,omitempty"`
+	Warnings   []Warning `json:"warnings"`
 }
+
+// HostIdleTimeout Whether sshd enforces Lor's 15-minute idle timeout (OpenSSH 10.5+ applies ChannelTimeout in Match blocks).
+type HostIdleTimeout string
 
 // HostDetail defines model for HostDetail.
 type HostDetail struct {

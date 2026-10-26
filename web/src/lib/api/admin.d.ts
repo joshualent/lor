@@ -728,6 +728,13 @@ export interface components {
             disabled: boolean;
             /** Format: date-time */
             created_at: string;
+            /** @description SSH software the host reported at its last scan, e.g. "OpenSSH_10.2p1 Ubuntu-2ubuntu3.8". */
+            ssh_version?: string;
+            /**
+             * @description Whether sshd enforces Lor's 15-minute idle timeout (OpenSSH 10.5+ applies ChannelTimeout in Match blocks).
+             * @enum {string}
+             */
+            idle_timeout: "enforced" | "unenforced" | "unknown";
             warnings: components["schemas"]["Warning"][];
         };
         HostDetail: {

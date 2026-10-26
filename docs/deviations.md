@@ -80,6 +80,10 @@ exact action, CSRF rules, agent text never rendered as HTML).
 
 ## Web UI (section 11)
 
+- **Times carry their time zone.** The offer chat line shows the admin's
+  zone and UTC ("until 15:51 EDT (19:51 UTC)"); the server's version and the
+  CLI label theirs ("19:51 UTC").
+
 - **CSP `style-src` includes `'unsafe-inline'`.** Svelte and bits-ui set
   inline `style` attributes (positioning, transitions); scripts stay
   `'self'` plus hashes, `connect-src 'self'`, as in the plan. lor-server adds
@@ -97,6 +101,22 @@ startup. The agent listener stays TLS in dev mode so the CLI's pinning is
 exercised.
 
 ## Bootstrap script (section 4)
+
+- **Lor's users get UIDs/GIDs from 59700–59799**, after checking that no
+  account, group, running process or file under `/home`, `/opt`, `/srv`,
+  `/var/lib`, `/var/opt` already uses the number. (Field test: a default
+  `useradd` gave `agent` UID 1000, the numeric user of a Docker workload,
+  so `agent` could write the app's database.) Users from older installs
+  outside the range are recreated with a fresh UID on the next run.
+- **Removing a user ends only its SSH sessions** (processes descending from
+  sshd), never other processes that happen to share the numeric UID.
+- **The idle timeout is only promised where it's enforced.** OpenSSH before
+  10.5 ignores `ChannelTimeout` inside `Match` blocks (fixed upstream in 10.5;
+  confirmed in the field test on Ubuntu 26.04's 10.2). Lor still writes the
+  plan's `ChannelTimeout`/`UnusedConnectionTimeout` lines, but the bootstrap
+  prints a note on affected hosts, each scan records the host's OpenSSH
+  version, and the consent page's Limits say "No idle timeout" for them. No
+  global sshd settings are changed to work around it.
 
 - **The drop-in also sets `AuthorizedKeysCommand none` and
   `AuthorizedPrincipalsCommand none`** for the agent users, so a host-wide

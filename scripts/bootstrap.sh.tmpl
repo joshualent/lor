@@ -29,6 +29,11 @@ DROPIN=$DROPIN_DIR/50-lor.conf
 SUDOERS=/etc/sudoers.d/50-lor-agent
 SSHD_CONFIG=/etc/ssh/sshd_config
 MANAGED=$LOR_DIR/managed-users
+# Lor's users get UIDs/GIDs from this range, after checking that no account,
+# process or file already uses the number. Other software (e.g. a container
+# image running as numeric UID 1000) must never share a UID with "agent".
+LOR_UID_MIN=59700
+LOR_UID_MAX=59799
 
 WANT_SUDO=1
 UNINSTALL=0
@@ -164,6 +169,44 @@ is_managed() { [ -f "$MANAGED" ] && grep -qx "$1" "$MANAGED"; }
 
 user_exists() { id "$1" >/dev/null 2>&1; }
 
+# uid_in_use N: true if an account, group, running process or file in the
+# usual data locations already uses N as a UID or GID.
+uid_in_use() {
+	getent passwd "$1" >/dev/null 2>&1 && return 0
+	getent group "$1" >/dev/null 2>&1 && return 0
+	for d in /proc/[0-9]*; do
+		awk -v n="$1" '/^(Uid|Gid):/ { for (i = 2; i <= NF; i++) if ($i == n) f = 1 } END { exit !f }' "$d/status" 2>/dev/null && return 0
+	done
+	for p in /home /opt /srv /var/lib /var/opt; do
+		[ -d "$p" ] || continue
+		[ -n "$(find "$p" -xdev \( -uid "$1" -o -gid "$1" \) -print -quit 2>/dev/null)" ] && return 0
+	done
+	return 1
+}
+
+pick_uid() {
+	n=$LOR_UID_MIN
+	while [ "$n" -le "$LOR_UID_MAX" ]; do
+		uid_in_use "$n" || {
+			printf '%s\n' "$n"
+			return 0
+		}
+		n=$((n + 1))
+	done
+	return 1
+}
+
+in_lor_range() { [ "$1" -ge "$LOR_UID_MIN" ] && [ "$1" -le "$LOR_UID_MAX" ]; }
+
+create_user() {
+	u=$1
+	uid=$(pick_uid) || die "no free UID in $LOR_UID_MIN-$LOR_UID_MAX for user $u"
+	getent group "$u" >/dev/null 2>&1 && die "a group named $u already exists; remove it or adopt the account with --force"
+	useradd --create-home --shell /bin/bash --comment "Lor agent" --uid "$uid" --user-group "$u"
+	CREATED_USERS="$CREATED_USERS $u"
+	say "created user $u (UID $uid)"
+}
+
 ensure_user() {
 	u=$1
 	if user_exists "$u"; then
@@ -172,14 +215,32 @@ ensure_user() {
 			say "adopting existing user $u (--force)"
 			getent shadow "$u" | cut -d: -f2 >"$BACKUP_DIR/passwd.$u"
 			ADOPTED_USERS="$ADOPTED_USERS $u"
+		elif ! in_lor_range "$(id -u "$u")"; then
+			# Installed by an older Lor with a default UID that other software
+			# (often a container's numeric user) may share: recreate it.
+			old_uid=$(id -u "$u")
+			say "user $u has UID $old_uid, outside Lor's range $LOR_UID_MIN-$LOR_UID_MAX; recreating it"
+			delete_user "$u"
+			create_user "$u"
 		fi
 	else
-		useradd --create-home --shell /bin/bash --comment "Lor agent" "$u"
-		CREATED_USERS="$CREATED_USERS $u"
-		say "created user $u"
+		create_user "$u"
 	fi
 	# '*' disables password login without "locking" the account.
 	usermod -p '*' "$u"
+}
+
+# delete_user removes an account after ending only its SSH sessions. Other
+# processes running with the same numeric UID are left alone.
+delete_user() {
+	u=$1
+	uid=$(id -u "$u")
+	kill_ssh_sessions "$uid"
+	others=$(count_uid_processes "$uid")
+	userdel -r "$u" >/dev/null 2>&1 || userdel -f -r "$u" >/dev/null 2>&1 || userdel -f "$u"
+	if [ "$others" -gt 0 ]; then
+		say "left $others process(es) running as UID $uid alone: they aren't Lor SSH sessions"
+	fi
 }
 
 remove_user() {
@@ -189,8 +250,7 @@ remove_user() {
 		say "leaving user $u alone: it wasn't created by Lor"
 		return 0
 	fi
-	kill_user_processes "$u"
-	userdel -r "$u" >/dev/null 2>&1 || userdel "$u"
+	delete_user "$u"
 	say "removed user $u"
 }
 
@@ -220,17 +280,41 @@ find_sshd_pid() {
 	done
 }
 
-# kill_user_processes ends an agent user's sessions before removing it.
-kill_user_processes() {
-	if command -v pkill >/dev/null 2>&1; then
-		pkill -KILL -u "$1" >/dev/null 2>&1 || true
-		return 0
-	fi
-	uid=$(id -u "$1" 2>/dev/null) || return 0
+# from_ssh PID: true if PID descends from an sshd process (a login session).
+from_ssh() {
+	p=$1
+	i=0
+	while [ "$p" -gt 1 ] && [ "$i" -lt 64 ]; do
+		p=$(sed -n 's/^PPid:[[:space:]]*//p' "/proc/$p/status" 2>/dev/null)
+		[ -n "$p" ] || return 1
+		case "$(cat "/proc/$p/comm" 2>/dev/null)" in
+		sshd | sshd-session | sshd-auth) return 0 ;;
+		esac
+		i=$((i + 1))
+	done
+	return 1
+}
+
+uid_pids() {
 	for d in /proc/[0-9]*; do
-		[ "$(sed -n 's/^Uid:[[:space:]]*\([0-9]*\).*/\1/p' "$d/status" 2>/dev/null)" = "$uid" ] && kill -KILL "${d#/proc/}" 2>/dev/null
+		[ "$(awk '/^Uid:/ { print $2 }' "$d/status" 2>/dev/null)" = "$1" ] && printf '%s\n' "${d#/proc/}"
 	done
 	return 0
+}
+
+# kill_ssh_sessions UID ends the user's SSH sessions (processes running as
+# UID that descend from sshd), and nothing else.
+kill_ssh_sessions() {
+	for pid in $(uid_pids "$1"); do
+		if from_ssh "$pid"; then
+			kill -KILL "$pid" 2>/dev/null || true
+		fi
+	done
+	return 0
+}
+
+count_uid_processes() {
+	uid_pids "$1" | wc -l | tr -d ' '
 }
 
 reload_sshd() {
@@ -309,6 +393,12 @@ if [ "$SSH_MAJOR" -lt 8 ] || { [ "$SSH_MAJOR" -eq 8 ] && [ "$SSH_MINOR" -lt 9 ];
 	die "OpenSSH $SSH_MAJOR.$SSH_MINOR is too old; Lor needs 8.9 or newer"
 fi
 NEW_TIMEOUTS=0
+# OpenSSH before 10.5 ignores ChannelTimeout inside Match blocks (fixed in
+# 10.5), so Lor's idle timeout is written but not enforced there.
+TIMEOUT_ENFORCED=0
+if [ "$SSH_MAJOR" -gt 10 ] || { [ "$SSH_MAJOR" -eq 10 ] && [ "$SSH_MINOR" -ge 5 ]; }; then
+	TIMEOUT_ENFORCED=1
+fi
 if [ "$SSH_MAJOR" -gt 9 ] || { [ "$SSH_MAJOR" -eq 9 ] && [ "$SSH_MINOR" -ge 2 ]; }; then
 	NEW_TIMEOUTS=1
 fi
@@ -456,4 +546,7 @@ if [ "$WANT_SUDO" -eq 0 ]; then
 fi
 
 say "Lor installed on $LOR_HOST (users: $users)"
+if [ "$TIMEOUT_ENFORCED" -eq 0 ]; then
+	say "note: OpenSSH $SSH_MAJOR.$SSH_MINOR doesn't enforce ChannelTimeout for Lor's users (fixed in OpenSSH 10.5); idle sessions stay open until closed"
+fi
 print_fingerprint

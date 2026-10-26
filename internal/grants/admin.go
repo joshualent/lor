@@ -264,13 +264,14 @@ func (s *Service) CreateOffer(ctx context.Context, actor string, in OfferInput) 
 }
 
 // OfferMessage is the line the admin pastes into chat after creating an
-// offer. It uses the server's local time zone.
+// offer, with the end time in UTC (labelled). The web UI shows its own
+// version in the admin's local time zone, with UTC alongside.
 func OfferMessage(host, level string, end time.Time) string {
 	lvl := ""
 	if level == LevelSudo {
 		lvl = " (sudo)"
 	}
-	return fmt.Sprintf("You have Lor access to `%s`%s until %s. Use `lor ssh %s -- <cmd>`.", host, lvl, end.Local().Format("15:04"), host)
+	return fmt.Sprintf("You have Lor access to `%s`%s until %s. Use `lor ssh %s -- <cmd>`.", host, lvl, end.UTC().Format("15:04 MST"), host)
 }
 
 // ExtendInput is an admin-initiated extension.
@@ -324,7 +325,7 @@ func (s *Service) CheckExtend(ctx context.Context, in ExtendInput) (string, erro
 			return err
 		}
 		newEnd := time.Unix(g.ValidBefore, 0).Add(in.Duration)
-		summary = fmt.Sprintf("Extend grant #%d on %s by %s (ends %s)", g.ID, h.Name, formatDuration(in.Duration), newEnd.Local().Format("Jan 2 15:04"))
+		summary = fmt.Sprintf("Extend grant #%d on %s by %s (ends %s)", g.ID, h.Name, formatDuration(in.Duration), newEnd.UTC().Format("Jan 2 15:04 MST"))
 		return nil
 	})
 	return summary, err
@@ -420,7 +421,7 @@ func (s *Service) CheckApproveExtension(ctx context.Context, in ApproveExtension
 			return err
 		}
 		newEnd := time.Unix(g.ValidBefore, 0).Add(in.Duration)
-		summary = fmt.Sprintf("Approve extension #%d: %s on %s +%s (ends %s)", e.ID, levelWord(g.Level), h.Name, formatDuration(in.Duration), newEnd.Local().Format("Jan 2 15:04"))
+		summary = fmt.Sprintf("Approve extension #%d: %s on %s +%s (ends %s)", e.ID, levelWord(g.Level), h.Name, formatDuration(in.Duration), newEnd.UTC().Format("Jan 2 15:04 MST"))
 		return nil
 	})
 	return summary, err

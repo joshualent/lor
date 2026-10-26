@@ -69,6 +69,7 @@ func hostView(h *store.Host) Host {
 		Id: h.ID, Name: h.Name, Address: h.Address, HostKey: sp(h.HostKey), HostKeyFingerprint: sp(hosts.Fingerprint(h.HostKey)),
 		HostKeySeenAt: tp(h.HostKeySeenAt), MaxLevel: Level(h.MaxLevel), Hypervisor: h.Hypervisor, LorInfra: h.LorInfra,
 		Notes: h.Notes, Disabled: h.Disabled, CreatedAt: tv(h.CreatedAt), Warnings: warnings(h),
+		SshVersion: sp(h.SSHVersion), IdleTimeout: HostIdleTimeout(hosts.IdleTimeout(h.SSHVersion)),
 	}
 }
 
@@ -206,7 +207,7 @@ func (h *Handlers) detail(ctx context.Context, g *store.Grant) (GrantDetail, err
 	if c := h.Grants.Consent(g, host); c != nil {
 		out.Consent = &Consent{
 			Levels: levels(c.Levels), DefaultLevel: Level(c.DefaultLevel), DefaultDurationS: int64(c.DefaultDuration / time.Second),
-			ApprovalDeadline: c.Deadline.UTC(), Limits: grants.Limits(agent),
+			ApprovalDeadline: c.Deadline.UTC(), Limits: grants.Limits(agent, host),
 		}
 	}
 	certs, err := h.DB.ListCertificates(ctx, g.ID)

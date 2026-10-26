@@ -142,13 +142,16 @@ func New(t testing.TB) *Env {
 	return e
 }
 
-func (e *Env) scan(_ context.Context, addr string) (ssh.PublicKey, error) {
+// SSHVersion is what the fake scanner reports as the host's SSH software.
+var SSHVersion = "OpenSSH_10.2p1 Ubuntu-2ubuntu3.8"
+
+func (e *Env) scan(_ context.Context, addr string) (ssh.PublicKey, string, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if k, ok := e.HostKeys[addr]; ok {
-		return k, nil
+		return k, SSHVersion, nil
 	}
-	return nil, fmt.Errorf("connection refused")
+	return nil, "", fmt.Errorf("connection refused")
 }
 
 // StartAgentTLS serves the agent API over TLS on 127.0.0.1 (Lor's

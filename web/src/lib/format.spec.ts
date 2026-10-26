@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatArgv, formatCountdown, formatDuration, formatAgo } from './format';
+import {
+	formatArgv,
+	formatCountdown,
+	formatDuration,
+	formatAgo,
+	formatClock,
+	offerChatLine
+} from './format';
 
 describe('formatDuration', () => {
 	it.each([
@@ -51,5 +58,21 @@ describe('formatArgv', () => {
 		expect(formatArgv(['zpool status | head'])).toBe('zpool status | head');
 		expect(formatArgv(['<script>'])).toBe('<script>');
 		expect(formatArgv([])).toBe('(interactive shell)');
+	});
+});
+
+describe('time zones', () => {
+	const end = Date.UTC(2026, 9, 26, 19, 51);
+	it('labels clock times with the zone', () => {
+		expect(formatClock(end, end, 'America/Detroit')).toMatch(/03:51\sPM EDT|15:51 EDT/);
+		expect(formatClock(end, end, 'UTC')).toMatch(/UTC/);
+	});
+	it('gives the offer chat line in the admin zone and UTC', () => {
+		expect(offerChatLine('vikunja', 'user', end, 'America/Detroit')).toBe(
+			'You have Lor access to `vikunja` until 15:51 EDT (19:51 UTC). Use `lor ssh vikunja -- <cmd>`.'
+		);
+		expect(offerChatLine('nas', 'sudo', end, 'UTC')).toBe(
+			'You have Lor access to `nas` (sudo) until 19:51 UTC. Use `lor ssh nas -- <cmd>`.'
+		);
 	});
 });

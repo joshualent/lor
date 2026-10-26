@@ -62,24 +62,64 @@ export function formatAgo(thenMs: number, nowMs: number): string {
 	return new Date(thenMs).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-/** Clock time, with the date when it isn't today: "14:45" or "Oct 26, 14:45". */
-export function formatClock(ms: number, nowMs: number): string {
+/**
+ * Clock time with the time zone, plus the date when it isn't today:
+ * "14:45 EDT" or "Oct 26, 14:45 EDT".
+ */
+export function formatClock(ms: number, nowMs: number, timeZone?: string): string {
 	const d = new Date(ms);
 	const n = new Date(nowMs);
-	const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+	const time = d.toLocaleTimeString(undefined, {
+		hour: '2-digit',
+		minute: '2-digit',
+		timeZoneName: 'short',
+		timeZone
+	});
 	if (d.toDateString() === n.toDateString()) return time;
-	return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`;
+	return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone })}, ${time}`;
 }
 
-/** Full timestamp for logs. */
+/** Full timestamp for logs, with the time zone. */
 export function formatTimestamp(ms: number): string {
 	return new Date(ms).toLocaleString(undefined, {
 		month: 'short',
 		day: 'numeric',
 		hour: '2-digit',
 		minute: '2-digit',
-		second: '2-digit'
+		second: '2-digit',
+		timeZoneName: 'short'
 	});
+}
+
+function hhmm(ms: number, timeZone?: string): string {
+	const time = new Date(ms).toLocaleTimeString('en-GB', {
+		hour: '2-digit',
+		minute: '2-digit',
+		timeZone
+	});
+	const zone =
+		new Intl.DateTimeFormat('en-US', { timeZoneName: 'short', timeZone })
+			.formatToParts(ms)
+			.find((p) => p.type === 'timeZoneName')?.value ?? '';
+	return zone ? `${time} ${zone}` : time;
+}
+
+/**
+ * The line to paste into chat after creating an offer. The agent's machine
+ * may be in another time zone, so the end time carries the admin's zone and
+ * UTC: "until 15:51 EDT (19:51 UTC)".
+ */
+export function offerChatLine(
+	host: string,
+	level: string,
+	endMs: number,
+	timeZone?: string
+): string {
+	const local = hhmm(endMs, timeZone);
+	const utc = hhmm(endMs, 'UTC');
+	const when = local === utc ? utc : `${local} (${utc})`;
+	const lvl = level === 'sudo' ? ' (sudo)' : '';
+	return `You have Lor access to \`${host}\`${lvl} until ${when}. Use \`lor ssh ${host} -- <cmd>\`.`;
 }
 
 /**

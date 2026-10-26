@@ -156,7 +156,10 @@ func (a *App) cleanup(cmd *cobra.Command) {
 		switch {
 		case res.JSON200 != nil && res.JSON200.Status == client.GrantStatusActive:
 			// Extended on the server; lor ssh fetches the new certificate.
-		case res.JSON200 != nil, res.StatusCode() == http.StatusNotFound:
+		case res.JSON200 != nil:
+			a.State.RecordEnded(EndedGrant{ID: id, Host: a.State.LocalHost(id), Status: string(res.JSON200.Status)})
+			a.State.RemoveGrant(id)
+		case res.StatusCode() == http.StatusNotFound:
 			a.State.RemoveGrant(id)
 		}
 	}
@@ -281,7 +284,7 @@ func until(t *time.Time, now time.Time) string {
 	if left < time.Minute {
 		left = t.Sub(now).Round(time.Second)
 	}
-	return fmt.Sprintf("until %s (%s left)", t.Local().Format("15:04"), formatDur(left))
+	return fmt.Sprintf("until %s (%s left)", t.Local().Format("15:04 MST"), formatDur(left))
 }
 
 func formatDur(d time.Duration) string {
@@ -823,6 +826,10 @@ func (a *App) ssh(ctx context.Context, host string, argv []string) error {
 		if ended != nil {
 			return exitf(ExitSSH, "grant %d for %s was %s; the local key was deleted. %s", ended.Id, host, ended.Status, nextStep("grant_"+string(ended.Status), host))
 		}
+		// The key may already have been deleted by this run's cleanup.
+		if e := a.State.RecentEnded(host); e != nil {
+			return exitf(ExitSSH, "grant %d for %s %s; the local key was deleted. %s", e.ID, host, endedPhrase(e.Status), nextStep("grant_"+e.Status, host))
+		}
 		return exitf(ExitSSH, "no access to %s; request it with: lor request %s --for <duration> --reason \"...\"", host, host)
 	}
 	if !a.State.HasKey(g.Id) {
@@ -889,6 +896,7 @@ func (a *App) reconcile(ctx context.Context, host string, open []client.Grant) *
 		if g.Status == client.GrantStatusActive || g.Status == client.GrantStatusPending || g.Status == client.GrantStatusOffered {
 			continue
 		}
+		a.State.RecordEnded(EndedGrant{ID: g.Id, Host: host, Status: string(g.Status)})
 		a.State.RemoveGrant(g.Id)
 		if ended == nil || g.Id > ended.Id {
 			ended = &g
@@ -898,6 +906,18 @@ func (a *App) reconcile(ctx context.Context, host string, open []client.Grant) *
 		a.State.WriteSSHConfig(0, nil)
 	}
 	return ended
+}
+
+func endedPhrase(status string) string {
+	switch status {
+	case "expired":
+		return "has expired"
+	case "revoked":
+		return "was revoked"
+	case "released":
+		return "was released"
+	}
+	return "ended (" + status + ")"
 }
 
 func nextStep(code, host string) string {

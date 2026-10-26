@@ -908,7 +908,7 @@ components:
         server_time: { type: string, format: date-time }
     Host:
       type: object
-      required: [id, name, address, max_level, hypervisor, lor_infra, notes, disabled, created_at, warnings]
+      required: [id, name, address, max_level, hypervisor, lor_infra, notes, disabled, created_at, warnings, idle_timeout]
       properties:
         id: { type: integer, format: int64 }
         name: { type: string }
@@ -922,6 +922,13 @@ components:
         notes: { type: string }
         disabled: { type: boolean }
         created_at: { type: string, format: date-time }
+        ssh_version:
+          type: string
+          description: SSH software the host reported at its last scan, e.g. "OpenSSH_10.2p1 Ubuntu-2ubuntu3.8".
+        idle_timeout:
+          type: string
+          enum: [enforced, unenforced, unknown]
+          description: Whether sshd enforces Lor's 15-minute idle timeout (OpenSSH 10.5+ applies ChannelTimeout in Match blocks).
         warnings:
           type: array
           items: { $ref: '#/components/schemas/Warning' }

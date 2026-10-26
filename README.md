@@ -81,6 +81,12 @@ RP ID `localhost`. It can't be set from the config file.
 Lor runs in its own small LXC (the plan uses an Ubuntu 26.04 LXC on the NAS:
 1 vCPU, 512 MB RAM). Copy the two static binaries; nothing else is needed.
 
+Proxmox notes from the field test: unprivileged Ubuntu 26.04 LXCs (systemd
+259) need `features: nesting=1`, or journald/networkd fail with
+`243/CREDENTIALS`; Docker targets also need `keyctl=1`. `pct exec` runs with a
+PATH that doesn't include `/usr/local/bin`, so call
+`/usr/local/bin/lor-server` with its full path there.
+
 1. **Install the server** on the Lor LXC:
 
    ```sh
@@ -114,6 +120,9 @@ Lor runs in its own small LXC (the plan uses an Ubuntu 26.04 LXC on the NAS:
        }
    }
    ```
+
+   `tls_trust_pool` needs **Caddy 2.8 or newer** (tested with 2.11.7 from
+   Caddy's official apt repository; Ubuntu 26.04's packaged 2.6.2 is too old).
 
    Caddy's own certificate for `lor.home.example.com` must be trusted by your
    devices (passkeys refuse pages with certificate warnings); use the same
@@ -155,6 +164,12 @@ Lor runs in its own small LXC (the plan uses an Ubuntu 26.04 LXC on the NAS:
    with Lor's. If anything fails it restores the previous state. Tier 1:
    Proxmox VE 8/9, Debian 12/13, Ubuntu 22.04/24.04/26.04 (OpenSSH ≥ 8.9);
    others need `--force`. `agent-sudo` needs `sudo` (or sudo-rs) installed.
+   The `agent` users get UIDs from 59700–59799 that no other account,
+   process or data directory uses (so they never share a numeric UID with a
+   container workload). On OpenSSH older than 10.5 the script notes that the
+   15-minute idle timeout isn't enforced (an upstream bug with
+   `ChannelTimeout` in `Match` blocks); the host page and consent page say so
+   too.
    Validation checks the effective sshd settings for loopback and for every
    agent IP registered when the link was generated, so add agents before
    bootstrapping (or re-run the bootstrap after adding one).

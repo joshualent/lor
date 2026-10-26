@@ -299,12 +299,12 @@ func (h *Handlers) ReleaseGrant(ctx context.Context, req ReleaseGrantRequestObje
 }
 
 // ErrorHandler renders errors as {"error": {code, message}}.
-func ErrorHandler(w http.ResponseWriter, _ *http.Request, err error) {
-	apierr.Write(w, err)
+func ErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
+	apierr.WriteFor(w, r, err)
 }
 
 // RequestErrorHandler renders request decoding errors.
-func RequestErrorHandler(w http.ResponseWriter, _ *http.Request, err error) {
+func RequestErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
 	var ae *apierr.Error
 	if errors.As(err, &ae) {
 		apierr.Write(w, ae)

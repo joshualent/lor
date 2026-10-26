@@ -27,6 +27,7 @@ const (
 	keyFile        = "id_ed25519"
 	certFile       = "id_ed25519-cert.pub"
 	metaFile       = "grant.json"
+	endedFile      = "ended.json"
 )
 
 // Config is ~/.config/lor/config.toml (mode 0600).
@@ -412,3 +413,63 @@ func (s *State) updateKnownHosts(lines map[string]string) error {
 
 // SSHConfigPath is the generated ssh_config.
 func (s *State) SSHConfigPath() string { return s.path(sshConfigFile) }
+
+// EndedGrant remembers a grant whose key was deleted because it ended, so a
+// later `lor ssh` can say why access is gone ("expired", "revoked") instead
+// of a generic "no access".
+type EndedGrant struct {
+	ID     int64     `json:"id"`
+	Host   string    `json:"host"`
+	Status string    `json:"status"`
+	At     time.Time `json:"at"`
+}
+
+const endedKeep = 24 * time.Hour
+
+func (s *State) loadEnded() []EndedGrant {
+	var list []EndedGrant
+	b, err := os.ReadFile(s.path(endedFile))
+	if err == nil {
+		json.Unmarshal(b, &list)
+	}
+	return list
+}
+
+// RecordEnded remembers that a grant ended (kept for a day, at most 50).
+func (s *State) RecordEnded(e EndedGrant) {
+	if e.Host == "" {
+		return
+	}
+	now := s.Now()
+	e.At = now
+	list := []EndedGrant{e}
+	for _, x := range s.loadEnded() {
+		if x.ID != e.ID && now.Sub(x.At) < endedKeep && len(list) < 50 {
+			list = append(list, x)
+		}
+	}
+	b, _ := json.Marshal(list)
+	os.MkdirAll(s.Dir, 0o700)
+	writeFileAtomic(s.path(endedFile), b, 0o600)
+}
+
+// RecentEnded returns the most recent ended grant for host within a day.
+func (s *State) RecentEnded(host string) *EndedGrant {
+	now := s.Now()
+	for _, x := range s.loadEnded() {
+		if x.Host == host && now.Sub(x.At) < endedKeep {
+			x := x
+			return &x
+		}
+	}
+	return nil
+}
+
+// LocalHost returns the host recorded for a local grant, if any.
+func (s *State) LocalHost(id int64) string {
+	g, err := s.loadMeta(id)
+	if err != nil {
+		return ""
+	}
+	return g.Host
+}

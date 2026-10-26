@@ -3,6 +3,7 @@ package grants
 import (
 	"fmt"
 
+	"github.com/joshualent/lor/internal/hosts"
 	"github.com/joshualent/lor/internal/store"
 )
 
@@ -47,18 +48,34 @@ func HostWarnings(h *store.Host) []Warning {
 }
 
 // Limits describes what a Lor certificate login can't do, for the consent
-// page.
-func Limits(agent *store.Agent) []string {
+// page. The idle-timeout line depends on the host's OpenSSH version: before
+// 10.5, sshd ignores ChannelTimeout inside Match blocks, so Lor's 15-minute
+// idle timeout is written but not enforced.
+func Limits(agent *store.Agent, host *store.Host) []string {
 	from := "any registered address"
 	if len(agent.LANAddrs) > 0 {
 		from = fmt.Sprintf("only %s", joinAddrs(agent.LANAddrs))
 	}
+	idle := "Idle timeout depends on the host's OpenSSH (enforced from 10.5); rescan the host to check"
+	switch hosts.IdleTimeout(host.SSHVersion) {
+	case "enforced":
+		idle = "Idle sessions close after 15 min"
+	case "unenforced":
+		idle = fmt.Sprintf("No idle timeout: %s doesn't enforce it (needs OpenSSH 10.5+); open sessions last until closed", sshName(host.SSHVersion))
+	}
 	return []string{
 		"Certificate login only",
 		"No port, agent or X11 forwarding",
-		"Idle sessions close after 15 min (OpenSSH 9.2+)",
+		idle,
 		"Connect from " + from,
 	}
+}
+
+func sshName(v string) string {
+	if major, minor, ok := hosts.OpenSSHVersion(v); ok {
+		return fmt.Sprintf("OpenSSH %d.%d", major, minor)
+	}
+	return "this OpenSSH"
 }
 
 func joinAddrs(a []string) string {

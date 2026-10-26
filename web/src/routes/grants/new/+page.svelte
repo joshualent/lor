@@ -5,7 +5,7 @@
 	import { toast } from 'svelte-sonner';
 	import { clock } from '#lib/clock.svelte.js';
 	import { errorMessage, isCancel } from '#lib/errors.js';
-	import { formatClock, formatDuration } from '#lib/format.js';
+	import { formatClock, formatDuration, offerChatLine } from '#lib/format.js';
 	import { keys, fetchAgents, fetchHosts, fetchSession } from '#lib/queries.js';
 	import { stepUp } from '#lib/webauthn.js';
 	import type { Level } from '#lib/api/client.js';
@@ -77,7 +77,10 @@
 				confirm_sudo: sudo && confirmed,
 				note
 			});
-			message = res.offer_message ?? null;
+			// Built here so the time is in the admin's zone (with UTC alongside).
+			message = res.grant?.valid_before
+				? offerChatLine(host.name, level, Date.parse(res.grant.valid_before))
+				: (res.offer_message ?? null);
 			createdId = res.grant?.id ?? null;
 			toast.success(`Offer created for ${agent.name} on ${host.name}`);
 			qc.invalidateQueries({ queryKey: keys.dashboard });

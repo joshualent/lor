@@ -46,11 +46,11 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	e := &env{ctx: ctx, db: db, now: time.Now(), keys: map[string]ssh.PublicKey{}}
-	scan := func(_ context.Context, addr string) (ssh.PublicKey, error) {
+	scan := func(_ context.Context, addr string) (ssh.PublicKey, string, error) {
 		if k, ok := e.keys[addr]; ok {
-			return k, nil
+			return k, "OpenSSH_10.2p1 Ubuntu-2ubuntu3.8", nil
 		}
-		return nil, errors.New("connection refused")
+		return nil, "", errors.New("connection refused")
 	}
 	e.svc, err = New(ctx, db, authority, "https://lor.example.com", scan, func() time.Time { return e.now })
 	if err != nil {
@@ -242,14 +242,17 @@ func TestScanRealSSHServer(t *testing.T) {
 			go func() { ssh.NewServerConn(c, cfg); c.Close() }()
 		}
 	}()
-	k, err := Scan(context.Background(), ln.Addr().String())
+	k, version, err := Scan(context.Background(), ln.Addr().String())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !strings.HasPrefix(version, "Go") {
+		t.Fatalf("server version %q (x/crypto servers announce SSH-2.0-Go)", version)
 	}
 	if MarshalKey(k) != MarshalKey(signer.PublicKey()) {
 		t.Fatal("wrong key")
 	}
-	if _, err := Scan(context.Background(), "127.0.0.1:1"); err == nil {
+	if _, _, err := Scan(context.Background(), "127.0.0.1:1"); err == nil {
 		t.Fatal("closed port should fail")
 	}
 }
@@ -281,5 +284,22 @@ func TestRename(t *testing.T) {
 	back := "nas"
 	if _, err := e.svc.Edit(e.ctx, "admin:x", "nas2", Update{Name: &back}); apierr.Code(err) != "host_in_use" {
 		t.Fatalf("rename with open grant: %v", err)
+	}
+}
+
+func TestIdleTimeoutByVersion(t *testing.T) {
+	cases := map[string]string{
+		"OpenSSH_10.5p1 Debian-1":          "enforced",
+		"OpenSSH_11.0":                     "enforced",
+		"OpenSSH_10.2p1 Ubuntu-2ubuntu3.8": "unenforced",
+		"OpenSSH_9.2p1 Debian-2+deb12u3":   "unenforced",
+		"OpenSSH_8.9p1 Ubuntu-3ubuntu0.10": "unenforced",
+		"dropbear_2022.83":                 "unknown",
+		"":                                 "unknown",
+	}
+	for in, want := range cases {
+		if got := IdleTimeout(in); got != want {
+			t.Errorf("IdleTimeout(%q) = %s, want %s", in, got, want)
+		}
 	}
 }

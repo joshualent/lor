@@ -3,6 +3,7 @@
 package apierr
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -59,11 +60,25 @@ type body struct {
 
 // Write renders err as JSON. Unknown errors become a generic 500 and are
 // logged; their text is never sent to the client.
-func Write(w http.ResponseWriter, err error) {
+func Write(w http.ResponseWriter, err error) { WriteFor(w, nil, err) }
+
+// WriteFor is Write with the request, which is logged with unexpected
+// errors. A request the client canceled (closed tab, navigation, server
+// shutdown) is normal and logged at debug level only.
+func WriteFor(w http.ResponseWriter, r *http.Request, err error) {
 	var e *Error
 	if !errors.As(err, &e) {
-		slog.Error("internal error", "err", err)
-		e = New(http.StatusInternalServerError, "internal", "internal server error")
+		attrs := []any{"err", err}
+		if r != nil {
+			attrs = append(attrs, "method", r.Method, "path", r.URL.Path)
+		}
+		if errors.Is(err, context.Canceled) || (r != nil && r.Context().Err() != nil) {
+			slog.Debug("request canceled", attrs...)
+			e = New(499, "canceled", "request canceled")
+		} else {
+			slog.Error("internal error", attrs...)
+			e = New(http.StatusInternalServerError, "internal", "internal server error")
+		}
 	}
 	var b body
 	b.Error.Code = e.Code

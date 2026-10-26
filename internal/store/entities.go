@@ -142,15 +142,16 @@ type Host struct {
 	Notes         string
 	Disabled      bool
 	CreatedAt     int64
+	SSHVersion    string // from the last scan, e.g. "OpenSSH_10.2p1 Ubuntu-2ubuntu3.8"
 }
 
 const hostCols = `id, name, address, COALESCE(host_key,''), COALESCE(host_key_seen_at,0), max_level,
-	hypervisor, lor_infra, notes, disabled, created_at`
+	hypervisor, lor_infra, notes, disabled, created_at, ssh_version`
 
 func scanHost(s scanner) (*Host, error) {
 	var h Host
 	if err := s.Scan(&h.ID, &h.Name, &h.Address, &h.HostKey, &h.HostKeySeenAt, &h.MaxLevel,
-		&h.Hypervisor, &h.LorInfra, &h.Notes, &h.Disabled, &h.CreatedAt); err != nil {
+		&h.Hypervisor, &h.LorInfra, &h.Notes, &h.Disabled, &h.CreatedAt, &h.SSHVersion); err != nil {
 		return nil, notFound(err)
 	}
 	return &h, nil
@@ -200,6 +201,12 @@ func (q q) ListHosts(ctx context.Context) ([]*Host, error) {
 func (q q) UpdateHost(ctx context.Context, h *Host) error {
 	return affected(q.db.ExecContext(ctx, `UPDATE hosts SET name = ?, address = ?, max_level = ?, hypervisor = ?, lor_infra = ?, notes = ?, disabled = ? WHERE id = ?`,
 		h.Name, h.Address, h.MaxLevel, b2i(h.Hypervisor), b2i(h.LorInfra), h.Notes, b2i(h.Disabled), h.ID))
+}
+
+// SetHostSSHVersion records the OpenSSH version seen at a scan.
+func (q q) SetHostSSHVersion(ctx context.Context, id int64, version string) error {
+	_, err := q.db.ExecContext(ctx, `UPDATE hosts SET ssh_version = ? WHERE id = ?`, version, id)
+	return err
 }
 
 // SetFirstHostKey stores a host's first key, only while it still has none

@@ -208,6 +208,14 @@
 					<Row label="Hypervisor">{h.hypervisor ? 'yes' : 'no'}</Row>
 					<Row label="Lor infra">{h.lor_infra ? 'yes (grants default to 15 min)' : 'no'}</Row>
 					<Row label="Status">{h.disabled ? 'disabled' : 'enabled'}</Row>
+					<Row label="SSH server">{h.ssh_version || 'unknown (rescan the key)'}</Row>
+					<Row label="Idle timeout"
+						>{h.idle_timeout === 'enforced'
+							? 'idle sessions close after 15 min'
+							: h.idle_timeout === 'unenforced'
+								? 'not enforced by this OpenSSH (needs 10.5+); sessions stay open until closed'
+								: 'unknown'}</Row
+					>
 					{#if h.notes}<Row label="Notes"><span class="whitespace-pre-wrap">{h.notes}</span></Row
 						>{/if}
 				</dl>

@@ -88,3 +88,22 @@ LXC out of a host for a while. That is sshd working as intended; it clears by
 itself. If it gets in the way of legitimate use, exempt the agent LXC on that
 host in the main sshd config (not in Lor's drop-in):
 `PerSourcePenaltyExemptList 192.168.1.50`.
+
+## Idle sessions aren't closed after 15 minutes
+
+Expected on OpenSSH older than 10.5: it ignores `ChannelTimeout` inside
+`Match` blocks (fixed upstream in 10.5), and Lor only sets it for its own
+users. The host page shows "Idle timeout: not enforced" and the consent page
+says so. Sessions still can't be *started* after a grant ends; an open one
+lasts until it is closed. Upgrade OpenSSH on the host to 10.5+ (then Rescan
+key so Lor records the new version), or end sessions by hand
+(`pkill -u agent` on the host) when needed.
+
+## A host's agent user shares a UID with other software
+
+Lor (since the field test) gives `agent`/`agent-sudo` UIDs from 59700–59799
+that nothing else uses. Hosts bootstrapped by an earlier build may have
+`agent` at UID 1000, which a container image can share: re-run the bootstrap
+one-liner; it recreates the users with fresh UIDs, without touching other
+processes. Removal (`--uninstall`, `--no-sudo`) only ends the agent's own SSH
+sessions.

@@ -346,6 +346,147 @@ func TestIntegration(t *testing.T) {
 		}
 	})
 
+	// ---- 18. Lor's idle-timeout claim matches what sshd actually enforces.
+	// OpenSSH < 10.5 ignores ChannelTimeout inside Match blocks; Lor must not
+	// promise an idle timeout there (field-test finding).
+	t.Run("18_idle_timeout_claim_matches_sshd", func(t *testing.T) {
+		var hd struct {
+			Host struct {
+				SSHVersion  string `json:"ssh_version"`
+				IdleTimeout string `json:"idle_timeout"`
+			} `json:"host"`
+		}
+		e.post("/hosts/nas/scan", map[string]any{}, nil)
+		e.get("/hosts/nas", &hd)
+		t.Logf("nas: %s, idle timeout %s", hd.Host.SSHVersion, hd.Host.IdleTimeout)
+		if !strings.HasPrefix(hd.Host.SSHVersion, "OpenSSH_") || hd.Host.IdleTimeout == "unknown" {
+			t.Fatalf("version not recorded: %+v", hd.Host)
+		}
+		const dropin = "/etc/ssh/sshd_config.d/50-lor.conf"
+		orig, _, _ := e.exec("nas", nil, "cat", dropin)
+		if !strings.Contains(orig, "ChannelTimeout session=15m") {
+			// OpenSSH < 9.2: no ChannelTimeout at all.
+			if hd.Host.IdleTimeout != "unenforced" {
+				t.Fatalf("no ChannelTimeout in the drop-in but Lor says %s", hd.Host.IdleTimeout)
+			}
+			return
+		}
+		reload := func() {
+			if _, errOut, code := e.exec("nas", nil, "sh", "-c", "/usr/sbin/sshd -t && kill -HUP $(cat /run/sshd.pid)"); code != 0 {
+				t.Fatalf("reload: %s", errOut)
+			}
+			time.Sleep(time.Second)
+			waitSSH(t, nasIP)
+		}
+		short := strings.Replace(orig, "ChannelTimeout session=15m", "ChannelTimeout session=3s", 1)
+		e.exec("nas", []byte(short), "sh", "-c", "cat > "+dropin)
+		reload()
+		defer func() {
+			e.exec("nas", []byte(orig), "sh", "-c", "cat > "+dropin)
+			reload()
+		}()
+		start := time.Now()
+		sshRun(nasIP, "agent", e.mintCert("nas", gateway, hour), "sleep 15")
+		enforced := time.Since(start) < 10*time.Second
+		t.Logf("idle session with ChannelTimeout session=3s lasted %s (enforced=%v)", time.Since(start).Round(100*time.Millisecond), enforced)
+		if enforced != (hd.Host.IdleTimeout == "enforced") {
+			t.Fatalf("sshd enforced=%v but Lor says idle_timeout=%s for %s", enforced, hd.Host.IdleTimeout, hd.Host.SSHVersion)
+		}
+	})
+
+	// ---- 19. Lor's users never share a UID with other software, and removing
+	// them only ends their SSH sessions (field-test finding: a container
+	// running as UID 1000 was killed by --uninstall).
+	t.Run("19_uid_collision_safety", func(t *testing.T) {
+		rb := func(cmd string) (string, int) {
+			out, errOut, code := e.exec("rb", nil, "sh", "-c", cmd)
+			return strings.TrimSpace(out + errOut), code
+		}
+		alive := func(pid string) bool {
+			_, code := rb("kill -0 " + pid)
+			return code == 0
+		}
+		startAs := func(uid string) string {
+			pid, code := rb("setsid setpriv --reuid " + uid + " --regid " + uid + " --clear-groups sleep 3600 >/dev/null 2>&1 & echo $!")
+			if code != 0 {
+				t.Fatalf("start workload as %s: %s", uid, pid)
+			}
+			return pid
+		}
+		rb("rm -f /etc/ssh/sshd_config.d/10-override.conf")
+		// A data directory owned by 59700 and a "container" process as 59701.
+		rb("mkdir -p /opt/app && chown 59700:59700 /opt/app")
+		w1 := startAs("59701")
+		defer rb("kill " + w1)
+
+		out, code := e.bootstrap("rb", "rb")
+		if code != 0 {
+			t.Fatalf("bootstrap: %d\n%s", code, out)
+		}
+		uid, _ := rb("id -u agent")
+		suid, _ := rb("id -u agent-sudo")
+		for _, u := range []string{uid, suid} {
+			n := atoi(u)
+			if n < 59700 || n > 59799 || u == "59700" || u == "59701" {
+				t.Fatalf("Lor user got UID %s (must be in 59700-59799 and unused)", u)
+			}
+		}
+
+		// Uninstall ends the agent's SSH sessions and nothing else.
+		done := make(chan error, 1)
+		go func() {
+			_, err := sshRun(rbIP, "agent", e.mintCert("rb", gateway, hour), "sleep 120")
+			done <- err
+		}()
+		time.Sleep(2 * time.Second)
+		if out, code := e.bootstrap("rb", "rb", "--uninstall"); code != 0 {
+			t.Fatalf("uninstall: %d\n%s", code, out)
+		}
+		select {
+		case <-done:
+		case <-time.After(20 * time.Second):
+			t.Fatal("uninstall left the agent's SSH session running")
+		}
+		if !alive(w1) {
+			t.Fatal("uninstall killed an unrelated process")
+		}
+
+		// A legacy install whose agent shares UID 4242 with a workload:
+		// uninstall leaves the workload alone.
+		legacy := "useradd -m -s /bin/bash -u 4242 agent && mkdir -p /etc/ssh/lor && echo agent > /etc/ssh/lor/managed-users"
+		if out, code := rb(legacy); code != 0 {
+			t.Fatalf("legacy user: %s", out)
+		}
+		w2 := startAs("4242")
+		defer rb("kill " + w2)
+		out, code = e.bootstrap("rb", "rb", "--uninstall")
+		if code != 0 || !strings.Contains(out, "left 1 process(es) running as UID 4242 alone") {
+			t.Fatalf("uninstall with shared UID: %d\n%s", code, out)
+		}
+		if !alive(w2) {
+			t.Fatal("uninstall killed the workload sharing the legacy UID")
+		}
+
+		// Re-running the bootstrap on a legacy install moves the user to Lor's
+		// range, again without touching the workload.
+		if out, code := rb(legacy); code != 0 {
+			t.Fatalf("legacy user: %s", out)
+		}
+		out, code = e.bootstrap("rb", "rb")
+		if code != 0 || !strings.Contains(out, "outside Lor's range") {
+			t.Fatalf("migration: %d\n%s", code, out)
+		}
+		if u, _ := rb("id -u agent"); atoi(u) < 59700 || atoi(u) > 59799 {
+			t.Fatalf("agent still has UID %s after migration", u)
+		}
+		if !alive(w2) {
+			t.Fatal("migration killed the workload")
+		}
+		if out, err := sshRun(rbIP, "agent", e.mintCert("rb", gateway, hour), "id -un"); err != nil || out != "agent" {
+			t.Fatalf("login after migration: %q %v", out, err)
+		}
+	})
+
 	// ---- 15. Extension in the last 30s keeps access past the original end;
 	// without one, access ends (sshd enforces expiry even for a saved key).
 	t.Run("15_extension_in_last_30s", func(t *testing.T) {

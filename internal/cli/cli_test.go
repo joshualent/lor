@@ -261,3 +261,30 @@ func TestUsageExitCodes(t *testing.T) {
 		t.Fatalf("unknown flag: %d", c)
 	}
 }
+
+// After a grant expires, lor ssh says so (even though the run's cleanup
+// already deleted the key) instead of a generic "no access".
+func TestExpiredGrantMessage(t *testing.T) {
+	h := newHarness(t)
+	h.e.AddHost("nas", "192.168.1.20", "sudo", false, false)
+	h.enroll("claude")
+	c, out, _ := h.run("request", "nas", "--for", "15m", "--reason", "Check the ZFS pool status and SMART data.")
+	if c != cli.ExitPending {
+		t.Fatalf("request: %d %s", c, out)
+	}
+	id := linkRe.FindStringSubmatch(out)[1]
+	var gid int64
+	json.Unmarshal([]byte(id), &gid)
+	h.e.StepUp(map[string]any{"kind": "authorize_request", "grant_id": gid, "level": "user", "duration_s": 120})
+	if c, _, errs := h.run("ssh", "nas", "--", "true"); c != 0 {
+		t.Fatalf("ssh: %d %s", c, errs)
+	}
+	h.e.Clock.Advance(3 * time.Minute)
+	c, _, errs := h.run("ssh", "nas", "--", "true")
+	if c != cli.ExitSSH || !strings.Contains(errs, "grant "+id+" for nas has expired") {
+		t.Fatalf("expired: %d %q", c, errs)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "grants", id)); !os.IsNotExist(err) {
+		t.Fatal("expired key not deleted")
+	}
+}

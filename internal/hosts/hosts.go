@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/netip"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"text/template"
@@ -71,25 +72,52 @@ func DialAddress(addr string) string {
 	return net.JoinHostPort(ip, strconv.Itoa(port))
 }
 
-// Scanner fetches a host's ed25519 host key.
-type Scanner func(ctx context.Context, addr string) (ssh.PublicKey, error)
+// Scanner fetches a host's ed25519 host key and its SSH software version
+// (from the server's banner, e.g. "OpenSSH_10.2p1 Ubuntu-2ubuntu3.8").
+type Scanner func(ctx context.Context, addr string) (ssh.PublicKey, string, error)
 
 var errGotKey = errors.New("host key captured")
 
-// Scan connects to addr (IP[:port]) and returns its ed25519 host key. It never
-// authenticates.
-func Scan(ctx context.Context, addr string) (ssh.PublicKey, error) {
+// bannerConn records the start of what the server sends (its version line).
+type bannerConn struct {
+	net.Conn
+	buf []byte
+}
+
+func (c *bannerConn) Read(p []byte) (int, error) {
+	n, err := c.Conn.Read(p)
+	if room := 512 - len(c.buf); room > 0 && n > 0 {
+		c.buf = append(c.buf, p[:min(n, room)]...)
+	}
+	return n, err
+}
+
+// serverVersion extracts the software part of "SSH-2.0-<software>\r\n".
+func (c *bannerConn) serverVersion() string {
+	for _, line := range strings.Split(string(c.buf), "\n") {
+		line = strings.TrimSpace(line)
+		if v, ok := strings.CutPrefix(line, "SSH-2.0-"); ok {
+			return strings.ToValidUTF8(v, "")
+		}
+	}
+	return ""
+}
+
+// Scan connects to addr (IP[:port]) and returns its ed25519 host key and SSH
+// version. It never authenticates.
+func Scan(ctx context.Context, addr string) (ssh.PublicKey, string, error) {
 	ctx, cancel := context.WithTimeout(ctx, ScanTimeout)
 	defer cancel()
 	var d net.Dialer
-	conn, err := d.DialContext(ctx, "tcp", DialAddress(addr))
+	raw, err := d.DialContext(ctx, "tcp", DialAddress(addr))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	defer conn.Close()
+	defer raw.Close()
 	if dl, ok := ctx.Deadline(); ok {
-		conn.SetDeadline(dl)
+		raw.SetDeadline(dl)
 	}
+	conn := &bannerConn{Conn: raw}
 	var key ssh.PublicKey
 	cfg := &ssh.ClientConfig{
 		User:              "lor-host-key-scan",
@@ -103,14 +131,44 @@ func Scan(ctx context.Context, addr string) (ssh.PublicKey, error) {
 	_, _, _, err = ssh.NewClientConn(conn, DialAddress(addr), cfg)
 	if key != nil {
 		if key.Type() != ssh.KeyAlgoED25519 {
-			return nil, fmt.Errorf("host offered a %s key; Lor needs ed25519", key.Type())
+			return nil, "", fmt.Errorf("host offered a %s key; Lor needs ed25519", key.Type())
 		}
-		return key, nil
+		return key, conn.serverVersion(), nil
 	}
 	if err == nil {
 		err = errors.New("no host key received")
 	}
-	return nil, fmt.Errorf("ssh handshake: %w", err)
+	return nil, "", fmt.Errorf("ssh handshake: %w", err)
+}
+
+var opensshVersionRe = regexp.MustCompile(`^OpenSSH_(\d+)\.(\d+)`)
+
+// OpenSSHVersion parses "OpenSSH_10.2p1 …" into (10, 2). ok is false for
+// other or unknown software.
+func OpenSSHVersion(software string) (major, minor int, ok bool) {
+	m := opensshVersionRe.FindStringSubmatch(software)
+	if m == nil {
+		return 0, 0, false
+	}
+	major, _ = strconv.Atoi(m[1])
+	minor, _ = strconv.Atoi(m[2])
+	return major, minor, true
+}
+
+// IdleTimeout says whether Lor's 15-minute idle timeout (ChannelTimeout in
+// its Match block) is enforced by a host's sshd: "enforced", "unenforced"
+// (OpenSSH < 10.5 ignores ChannelTimeout in Match blocks; < 9.2 doesn't have
+// it) or "unknown".
+func IdleTimeout(software string) string {
+	major, minor, ok := OpenSSHVersion(software)
+	switch {
+	case !ok:
+		return "unknown"
+	case major > 10 || (major == 10 && minor >= 5):
+		return "enforced"
+	default:
+		return "unenforced"
+	}
 }
 
 // MarshalKey renders a public key in authorized_keys format without comment.
@@ -348,9 +406,15 @@ func (s *Service) Rescan(ctx context.Context, actor, name string) (*ScanResult, 
 	if err != nil {
 		return nil, err
 	}
-	k, err := s.scan(ctx, h.Address)
+	k, version, err := s.scan(ctx, h.Address)
 	if err != nil {
 		return nil, apierr.New(502, "scan_failed", "couldn't read the host key from %s: %v", h.Address, err)
+	}
+	if version != h.SSHVersion {
+		if err := s.db.SetHostSSHVersion(ctx, h.ID, version); err != nil {
+			return nil, err
+		}
+		h.SSHVersion = version
 	}
 	key := MarshalKey(k)
 	res := &ScanResult{Host: h, Key: key, Fingerprint: ssh.FingerprintSHA256(k)}
