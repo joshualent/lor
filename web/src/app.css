@@ -1,0 +1,103 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn-svelte/tailwind.css';
+
+/*
+ * Lor theme: dark only, calm charcoal greys (not black), one restrained
+ * accent. Text pairs pass WCAG AA on every surface (checked in
+ * src/lib/theme.spec.ts).
+ */
+:root {
+	color-scheme: dark;
+
+	--background: #232326;
+	--foreground: #ececee;
+	--card: #2b2b2f;
+	--card-foreground: #ececee;
+	--popover: #2f2f34;
+	--popover-foreground: #ececee;
+
+	/* The accent: used for the main action on a page and focus rings only. */
+	--primary: #9db9ee;
+	--primary-foreground: #16171b;
+
+	--secondary: #36363c;
+	--secondary-foreground: #ececee;
+	--muted: #2f2f34;
+	--muted-foreground: #a9a9b2;
+	--accent: #36363c;
+	--accent-foreground: #ececee;
+
+	--destructive: #f0897f;
+	--warning: #e6b866;
+	--success: #8fcca2;
+
+	--border: #3a3a40;
+	--input: #45454c;
+	--ring: #9db9ee;
+
+	--radius: 0.625rem;
+}
+
+@theme inline {
+	--font-sans:
+		ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-warning: var(--warning);
+	--color-success: var(--success);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+
+	--radius-sm: calc(var(--radius) * 0.6);
+	--radius-md: calc(var(--radius) * 0.8);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) * 1.4);
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	html {
+		@apply bg-background font-sans antialiased;
+		-webkit-text-size-adjust: 100%;
+	}
+	body {
+		@apply min-h-dvh bg-background text-[15px] leading-relaxed text-foreground;
+	}
+	h1,
+	h2,
+	h3 {
+		@apply font-semibold tracking-tight text-balance;
+	}
+	a:not([data-slot]) {
+		@apply underline-offset-4 hover:underline;
+	}
+	code,
+	kbd,
+	pre {
+		@apply font-mono text-[0.92em];
+	}
+}
+
+/* Plain-text block for anything written by an agent. */
+@utility unverified-text {
+	@apply border-l-2 border-muted-foreground/40 pl-3 break-words whitespace-pre-wrap text-foreground;
+}

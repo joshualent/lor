@@ -1,0 +1,186 @@
+// End-to-end: the web UI against `lor-server serve --dev`, with Chrome's
+// virtual authenticator and the real `lor` CLI as the agent (plan section 13).
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { join } from 'node:path';
+import { addAuthenticator, lor, state } from './helpers';
+
+const shots = join(import.meta.dirname, '.tmp', 'screens');
+const HOSTILE = `<script>window.__pwned=1</script><img src=x onerror="window.__pwned=2"> <b>bold</b> Check the ZFS pool & SMART data.`;
+
+test.describe.configure({ mode: 'serial' });
+
+let context: BrowserContext;
+let page: Page;
+let requestId = '';
+
+test.beforeAll(async ({ browser }) => {
+	context = await browser.newContext({ baseURL: 'http://localhost:18444' });
+	page = await context.newPage();
+	await addAuthenticator(page);
+});
+
+test.afterAll(async () => {
+	await context.close();
+});
+
+async function signIn() {
+	await page.getByRole('button', { name: 'Sign in with passkey' }).click();
+}
+
+test('first-passkey setup, then login', async () => {
+	await page.goto('/');
+	await expect(page).toHaveURL(/\/setup$/);
+	await page.screenshot({ path: join(shots, 'setup.png') });
+	await page.getByLabel('Setup code').fill(state.setupCode);
+	await page.getByLabel('Passkey name').fill('Test passkey');
+	await page.getByRole('button', { name: 'Register passkey' }).click();
+	await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+
+	await page.getByRole('button', { name: 'Sign out' }).click();
+	await expect(page).toHaveURL(/\/login/);
+	await page.screenshot({ path: join(shots, 'login.png') });
+	await signIn();
+	await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+});
+
+test('add a host and enroll an agent', async () => {
+	await page.goto('/hosts');
+	await page.getByRole('button', { name: 'Add host' }).first().click();
+	await page.getByLabel('Name').fill('nas');
+	await page.getByLabel('LAN IP').fill(state.sshAddr);
+	await page.getByText('Lor infrastructure (runs Lor').click();
+	await page.getByRole('button', { name: 'Add host' }).last().click();
+	await expect(page).toHaveURL(/\/hosts\/nas$/);
+	await expect(page.getByText(/^SHA256:/)).toBeVisible();
+	await expect(page.getByText(/curl -fsSL '.*\/bootstrap\/nas\.sh\?t=/).first()).toBeVisible();
+	await page.screenshot({ path: join(shots, 'host.png'), fullPage: true });
+
+	await page.goto('/agents');
+	await page.getByRole('button', { name: 'Add agent' }).first().click();
+	await page.getByLabel('Name').fill('claude');
+	await page.getByLabel('LAN IP').fill('127.0.0.1');
+	await page.getByRole('button', { name: 'Add agent' }).last().click();
+	const cmd = (await page.locator('code', { hasText: 'lor enroll' }).textContent())!.trim();
+	expect(cmd).toContain(`--fingerprint ${state.fingerprint}`);
+	const args = cmd.split(/\s+/).slice(1);
+	const res = await lor(...args);
+	expect(res.code, res.stderr).toBe(0);
+	expect(res.stdout).toContain('Enrolled as "claude"');
+});
+
+test('agent request with a hostile reason; signed-out deep link goes through login', async () => {
+	const res = await lor('request', 'nas', '--sudo', '--for', '2h', '--reason', HOSTILE);
+	expect(res.code, res.stderr).toBe(10);
+	const m = res.stdout.match(/http:\/\/localhost:18444\/r\/(\d+)/);
+	expect(m, res.stdout).not.toBeNull();
+	requestId = m![1];
+
+	await context.clearCookies();
+	await page.goto(`/r/${requestId}`);
+	await expect(page).toHaveURL(new RegExp(`/login\\?next=%2Fr%2F${requestId}$`));
+	await signIn();
+	await expect(page).toHaveURL(new RegExp(`/r/${requestId}$`));
+	await expect(page.getByTestId('consent')).toBeVisible();
+	await expect(page.getByRole('heading', { name: /claude wants access to\s+nas/ })).toBeVisible();
+});
+
+test('the hostile reason is shown as plain text', async () => {
+	const block = page.getByTestId('unverified-text');
+	await expect(block).toHaveText(HOSTILE);
+	expect(await block.locator('b, img, script').count()).toBe(0);
+	expect(await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined();
+	await expect(page.getByText('Reason (written by the agent, unverified)')).toBeVisible();
+	// Server-computed warnings: Lor infrastructure + root.
+	await expect(page.locator('[data-warning="lor_infra"]')).toBeVisible();
+	await expect(page.locator('[data-warning="root_access"]')).toBeVisible();
+	await page.screenshot({ path: join(shots, 'consent-desktop.png'), fullPage: true });
+});
+
+test('the sudo checkbox gates the authorize button', async () => {
+	const authorize = page.getByTestId('authorize');
+	await expect(authorize).toHaveText(/Authorize sudo on nas for 15 min/); // lor_infra default
+	await expect(authorize).toBeDisabled();
+	await page.getByText('I understand this gives root on nas').click();
+	await expect(authorize).toBeEnabled();
+	await page.getByText('I understand this gives root on nas').click();
+	await expect(authorize).toBeDisabled();
+});
+
+test('authorize with changes: the grant is active at the lower level', async () => {
+	await page.getByText('Standard user', { exact: true }).click();
+	await expect(page.getByText('I understand this gives root on nas')).toBeHidden();
+	await expect(page.locator('[data-warning="root_access"]')).toBeHidden();
+	await page.getByRole('radio', { name: '30 min' }).click();
+	const authorize = page.getByTestId('authorize');
+	await expect(authorize).toHaveText(/Authorize standard user on nas for 30 min/);
+	await authorize.click();
+	await expect(page.getByTestId('grant')).toBeVisible();
+	await expect(page.locator('[data-status="active"]')).toBeVisible();
+	await expect(page.getByText(/standard user\s*\(asked for sudo\)/)).toBeVisible();
+	// A decided request never shows an Authorize button.
+	await expect(page.getByTestId('authorize')).toHaveCount(0);
+
+	const status = await lor('status');
+	expect(status.stdout).toMatch(/nas\s+user\s+active/);
+});
+
+test('the command log shows commands after lor ssh reports them', async () => {
+	// The fake SSH server rejects the login, but the command is reported first.
+	const res = await lor('ssh', 'nas', '--', 'zpool', 'status', '-v');
+	expect(res.code).toBe(255);
+	await page.reload();
+	await expect(page.getByTestId('command-log')).toContainText('zpool status -v');
+	await expect(page.getByText("Reported by the agent's CLI.")).toBeVisible();
+	await page.screenshot({ path: join(shots, 'grant-active.png'), fullPage: true });
+
+	await page.goto('/');
+	await expect(page.getByText('zpool status -v')).toBeVisible();
+	await page.screenshot({ path: join(shots, 'dashboard.png'), fullPage: true });
+});
+
+test('consent page on a phone-sized viewport', async () => {
+	const res = await lor('release', 'nas');
+	expect(res.code, res.stderr).toBe(0);
+	const req = await lor('request', 'nas', '--for', '1h', '--reason', 'Read the syslog to find why the backup job failed last night.');
+	expect(req.code).toBe(10);
+	const id = req.stdout.match(/\/r\/(\d+)/)![1];
+
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto(`/r/${id}`);
+	await expect(page.getByTestId('consent')).toBeVisible();
+	const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+	expect(overflow).toBeLessThanOrEqual(0);
+	// The action bar sticks to the bottom of the screen, reachable one-handed.
+	const authorize = page.getByTestId('authorize');
+	await expect(authorize).toBeInViewport();
+	await expect(authorize).toBeEnabled(); // user level: no checkbox needed
+	await page.screenshot({ path: join(shots, 'consent-phone.png') });
+	await page.screenshot({ path: join(shots, 'consent-phone-full.png'), fullPage: true });
+
+	// Deny uses a bottom drawer on phones.
+	await page.getByRole('button', { name: 'Deny' }).click();
+	await expect(page.getByText('Deny this request?')).toBeVisible();
+	await page.screenshot({ path: join(shots, 'deny-drawer-phone.png') });
+	await page.getByLabel('Note (optional)').fill('Not tonight');
+	await page.getByTestId('confirm-deny').click();
+	await expect(page.locator('[data-status="denied"]')).toBeVisible();
+	await page.setViewportSize({ width: 1280, height: 720 });
+});
+
+test('grant access form (offer) with a chat line to copy', async () => {
+	await page.goto('/grants/new');
+	await page.getByLabel('Agent').selectOption({ label: 'claude' });
+	await page.getByLabel('Host').selectOption({ label: `nas · ${state.sshAddr}` });
+	await page.getByText('sudo (root)', { exact: false }).first().click();
+	const create = page.getByTestId('create-offer');
+	await expect(create).toBeDisabled();
+	await page.getByText('I understand this gives root on nas').click();
+	await expect(create).toBeEnabled();
+	await page.screenshot({ path: join(shots, 'offer-form.png'), fullPage: true });
+	await create.click();
+	await expect(page.getByText(/You have Lor access to `nas` \(sudo\) until/)).toBeVisible();
+
+	// The agent claims it on first use.
+	const res = await lor('ssh', 'nas', '--', 'id');
+	expect(res.stderr).toContain('claimed the offer');
+});

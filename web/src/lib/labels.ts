@@ -1,0 +1,47 @@
+// Human labels for audit actions (falls back to the raw action).
+const LABELS: Record<string, string> = {
+	'grant.requested': 'Requested',
+	'grant.offered': 'Offer created',
+	'grant.offer_claimed': 'Offer claimed',
+	'grant.authorized': 'Authorized',
+	'grant.denied': 'Denied',
+	'grant.extended': 'Extended',
+	'grant.released': 'Released by the agent',
+	'grant.revoked': 'Revoked',
+	'grant.expired': 'Expired',
+	'grant.offer_expired': 'Offer expired',
+	'grant.request_timeout': 'Request timed out',
+	'grant.reused': 'Reused by a new request',
+	'cert.issued': 'Certificate issued',
+	'extension.requested': 'Extension requested',
+	'extension.approved': 'Extension approved',
+	'extension.denied': 'Extension denied',
+	'extension.request_timeout': 'Extension timed out',
+	'extension.moot': 'Extension no longer needed',
+	'agent.created': 'Agent added',
+	'agent.enrolled': 'Agent enrolled',
+	'agent.token_rotated': 'Agent token rotated',
+	'agent.disabled': 'Agent disabled',
+	'agent.enabled': 'Agent enabled',
+	'agent.addrs_changed': 'Agent LAN IPs changed',
+	'host.created': 'Host added',
+	'host.updated': 'Host updated',
+	'host.key_scanned': 'Host key scanned',
+	'host.key_changed_detected': 'Changed host key detected',
+	'host.key_changed_accepted': 'Changed host key accepted',
+	'host.bootstrap_fetched': 'Bootstrap script fetched',
+	'passkey.added': 'Passkey added',
+	'passkey.removed': 'Passkey removed',
+	'passkey.renamed': 'Passkey renamed',
+	'admin.setup': 'First passkey registered',
+	'admin.login': 'Signed in',
+	'admin.logout': 'Signed out',
+	'admin.sessions_revoked': 'Signed out everywhere',
+	'admin.reset': 'Admin reset (console)',
+	'ca.generated': 'CA key generated',
+	'tls.generated': 'TLS certificate generated'
+};
+
+export function actionLabel(action: string): string {
+	return LABELS[action] ?? action;
+}
