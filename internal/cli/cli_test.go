@@ -248,3 +248,16 @@ func TestExtendedWhileIdle(t *testing.T) {
 		t.Fatal("expired grant directory not deleted")
 	}
 }
+
+func TestUsageExitCodes(t *testing.T) {
+	h := newHarness(t)
+	if c, _, _ := h.run("ssh"); c != cli.ExitSSH {
+		t.Fatalf("lor ssh without host: %d", c)
+	}
+	if c, _, _ := h.run("request"); c != cli.ExitInvalid {
+		t.Fatalf("lor request without host: %d", c)
+	}
+	if c, _, _ := h.run("status", "--bogus"); c != cli.ExitInvalid {
+		t.Fatalf("unknown flag: %d", c)
+	}
+}

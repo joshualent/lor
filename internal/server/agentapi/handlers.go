@@ -23,6 +23,10 @@ type Handlers struct {
 
 var _ StrictServerInterface = (*Handlers)(nil)
 
+// maxDurationS bounds durations before converting to time.Duration (no
+// overflow); the real limits are checked by the grants package.
+const maxDurationS = int64(10 * 365 * 24 * 3600)
+
 // PublicOperations need no bearer token.
 var PublicOperations = map[string]bool{"Enroll": true}
 
@@ -168,8 +172,8 @@ func (h *Handlers) CreateGrant(ctx context.Context, req CreateGrantRequestObject
 	}
 	in := grants.RequestInput{Host: req.Body.Host, Level: string(req.Body.Level), Reason: req.Body.Reason, PublicKey: req.Body.PublicKey}
 	if req.Body.DurationS != nil {
-		if *req.Body.DurationS <= 0 {
-			return nil, apierr.BadRequest("invalid_duration", "duration must be positive")
+		if *req.Body.DurationS <= 0 || *req.Body.DurationS > maxDurationS {
+			return nil, apierr.BadRequest("invalid_duration", "duration out of range")
 		}
 		in.Duration = time.Duration(*req.Body.DurationS) * time.Second
 	}
@@ -270,8 +274,8 @@ func (h *Handlers) ExtendGrant(ctx context.Context, req ExtendGrantRequestObject
 	if req.Body == nil {
 		return nil, apierr.BadRequest("invalid_request", "missing body")
 	}
-	if req.Body.DurationS <= 0 {
-		return nil, apierr.BadRequest("invalid_duration", "duration must be positive")
+	if req.Body.DurationS <= 0 || req.Body.DurationS > maxDurationS {
+		return nil, apierr.BadRequest("invalid_duration", "duration out of range")
 	}
 	ext, reused, err := h.Grants.RequestExtension(ctx, reqctx.Agent(ctx), req.Id, time.Duration(req.Body.DurationS)*time.Second, req.Body.Reason)
 	if err != nil {

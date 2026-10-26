@@ -605,3 +605,16 @@ func TestDashboard(t *testing.T) {
 		t.Fatalf("dashboard %+v", d)
 	}
 }
+
+func TestDurationOverflowRejected(t *testing.T) {
+	e := testenv.New(t)
+	e.Setup()
+	e.AddHost("nas", "192.168.1.20", "sudo", false, false)
+	_, token := e.AddAgent("claude", testenv.AgentIP)
+	r := e.AgentDo(testenv.AgentIP, token, "POST", "/api/v1/grants", map[string]any{
+		"host": "nas", "level": "user", "duration_s": int64(18446744077310), "reason": reason, "public_key": testenv.NewPublicKey(),
+	})
+	if r.Code != 400 || r.ErrCode() != "invalid_duration" {
+		t.Fatalf("overflowing duration: %d %s", r.Code, r.Body)
+	}
+}

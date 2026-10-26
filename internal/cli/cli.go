@@ -71,6 +71,8 @@ func NewApp() (*App, error) {
 // Run executes the CLI and returns the process exit code.
 func (a *App) Run(args []string) int {
 	root := a.root()
+	a.inSSH = len(args) > 0 && args[0] == "ssh"
+	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return &usageError{err} })
 	root.SetArgs(args)
 	root.SetOut(a.Out)
 	root.SetErr(a.Err)
@@ -86,10 +88,33 @@ func (a *App) Run(args []string) int {
 		return ee.Code
 	}
 	fmt.Fprintln(a.Err, "lor:", err)
-	if a.inSSH {
+	switch {
+	case a.inSSH:
 		return ExitSSH
+	case isUsageError(err):
+		return ExitInvalid
 	}
 	return ExitError
+}
+
+// usageError marks invalid flags or arguments (exit 4).
+type usageError struct{ err error }
+
+func (e *usageError) Error() string { return e.err.Error() }
+
+func isUsageError(err error) bool {
+	var ue *usageError
+	if errors.As(err, &ue) {
+		return true
+	}
+	// Cobra's own argument and command errors.
+	msg := err.Error()
+	for _, p := range []string{"unknown command", "unknown flag", "unknown shorthand", "required flag", "accepts ", "requires at least", "invalid argument"} {
+		if strings.Contains(msg, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *App) root() *cobra.Command {
@@ -745,7 +770,7 @@ func (a *App) ssh(ctx context.Context, host string, argv []string) error {
 	if err != nil {
 		return exitf(ExitSSH, "%v", err)
 	}
-	grants, err := a.listGrants(ctx, host, nil)
+	grants, err := a.listGrants(ctx, host, []client.GrantStatus{client.GrantStatusActive, client.GrantStatusOffered, client.GrantStatusPending})
 	var ne *netError
 	if errors.As(err, &ne) {
 		return a.offline(host, argv, err)
@@ -753,8 +778,9 @@ func (a *App) ssh(ctx context.Context, host string, argv []string) error {
 	if err != nil {
 		return exitf(ExitSSH, "%v", err)
 	}
-	// Delete local keys of grants that ended (revoked, released, expired).
-	ended := a.reconcile(grants)
+	// Delete local keys of this host's grants that ended (revoked, released,
+	// expired): any local grant that isn't in the open list.
+	ended := a.reconcile(ctx, host, grants)
 	g := pickActive(grants, a.State)
 	if g == nil {
 		// Claim an offer on first use.
@@ -829,18 +855,39 @@ func (a *App) ssh(ctx context.Context, host string, argv []string) error {
 	return a.execSSH(host, argv)
 }
 
-// reconcile deletes local grant directories whose grant is no longer active
-// and returns the most recent such grant (if any).
-func (a *App) reconcile(grants []client.Grant) *client.Grant {
+// reconcile deletes local grant directories for host whose grant is no
+// longer open, and returns the most recent such grant (if any).
+func (a *App) reconcile(ctx context.Context, host string, open []client.Grant) *client.Grant {
+	isOpen := map[int64]bool{}
+	for _, g := range open {
+		isOpen[g.Id] = true
+	}
+	c, _, err := a.api()
+	if err != nil {
+		return nil
+	}
 	var ended *client.Grant
-	for i := range grants {
-		g := &grants[i]
-		if g.Status == client.GrantStatusActive || g.Status == client.GrantStatusPending || !a.State.HasKey(g.Id) {
+	for _, lg := range a.State.LocalGrants() {
+		if lg.Host != host || isOpen[lg.ID] {
+			continue
+		}
+		res, err := c.GetGrantWithResponse(ctx, lg.ID, nil)
+		if err != nil {
+			continue // can't confirm; keep it
+		}
+		if res.JSON200 == nil {
+			if res.StatusCode() == http.StatusNotFound {
+				a.State.RemoveGrant(lg.ID)
+			}
+			continue
+		}
+		g := *res.JSON200
+		if g.Status == client.GrantStatusActive || g.Status == client.GrantStatusPending || g.Status == client.GrantStatusOffered {
 			continue
 		}
 		a.State.RemoveGrant(g.Id)
 		if ended == nil || g.Id > ended.Id {
-			ended = g
+			ended = &g
 		}
 	}
 	if ended != nil {
@@ -883,6 +930,9 @@ func (a *App) offline(host string, argv []string, cause error) error {
 		return exitf(ExitSSH, "%v (and no valid local certificate for %s)", cause, host)
 	}
 	fmt.Fprintf(a.Err, "lor: warning: %v; using the local certificate, so this command isn't logged\n", cause)
+	if vb, ok := a.State.CertValidBefore(best.ID); ok && vb.Sub(now) < 5*time.Minute {
+		fmt.Fprintf(a.Err, "lor: warning: access to %s ends in %s; if you still need it, run: lor extend %s --for <duration> --reason \"...\"\n", host, formatDur(vb.Sub(now)), host)
+	}
 	if err := a.State.WriteSSHConfig(best.ID, nil); err != nil {
 		return exitf(ExitSSH, "%v", err)
 	}

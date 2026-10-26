@@ -5,9 +5,12 @@
 
 	let {
 		value = $bindable(),
+		// Write-only bindable prop (the parent reads it); ESLint can't see that.
+		// eslint-disable-next-line no-useless-assignment
+		valid = $bindable(),
 		max,
 		id = 'duration'
-	}: { value: number; max?: number; id?: string } = $props();
+	}: { value: number; valid?: boolean; max?: number; id?: string } = $props();
 
 	let custom = $state(false);
 	let customText = $state('');
@@ -31,6 +34,12 @@
 		const s = parseDuration(customText);
 		if (s) value = s;
 	}
+
+	// Callers disable submission while a custom duration is empty or invalid,
+	// so an earlier preset can't be authorized by accident.
+	$effect(() => {
+		valid = !custom || parseDuration(customText) !== null;
+	});
 
 	const customInvalid = $derived(
 		custom && customText.trim() !== '' && parseDuration(customText) === null

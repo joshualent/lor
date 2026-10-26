@@ -33,6 +33,7 @@
 	let hostId = $state<number | null>(Number(page.url.searchParams.get('host_id')) || null);
 	let level = $state<Level>('user');
 	let duration = $state(3600);
+	let durationValid = $state(true);
 	let note = $state('');
 	let confirmed = $state(false);
 	let busy = $state(false);
@@ -59,7 +60,7 @@
 	});
 
 	const sudo = $derived(level === 'sudo');
-	const ready = $derived(!!host && !!agent && (!sudo || confirmed) && !busy);
+	const ready = $derived(!!host && !!agent && (!sudo || confirmed) && durationValid && !busy);
 	const endsAt = $derived(clock.now + duration * 1000);
 
 	async function submit(e: SubmitEvent) {
@@ -173,7 +174,7 @@
 		{#if host}<Warnings warnings={host.warnings} {level} />{/if}
 
 		<Section title="Duration">
-			<DurationPicker bind:value={duration} id="offer-duration" />
+			<DurationPicker bind:value={duration} bind:valid={durationValid} id="offer-duration" />
 		</Section>
 
 		<Section>

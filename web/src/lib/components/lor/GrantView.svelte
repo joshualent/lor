@@ -43,6 +43,7 @@
 	// Consent choices (initialized from the server's defaults once).
 	let level = $state<Level>('user');
 	let duration = $state(3600);
+	let durationValid = $state(true);
 	let confirmed = $state(false);
 	let initialized = $state(false);
 	$effect(() => {
@@ -81,7 +82,7 @@
 	}
 
 	const sudo = $derived(level === 'sudo');
-	const canAuthorize = $derived(!!g?.actions.authorize && (!sudo || confirmed));
+	const canAuthorize = $derived(!!g?.actions.authorize && (!sudo || confirmed) && durationValid);
 	const endsAt = $derived(clock.now + duration * 1000);
 
 	async function authorize() {
@@ -213,7 +214,7 @@
 			</Section>
 
 			<Section title="Duration">
-				<DurationPicker bind:value={duration} />
+				<DurationPicker bind:value={duration} bind:valid={durationValid} />
 				<p class="mt-3 text-sm text-muted-foreground">
 					→ ends {formatClock(endsAt, clock.now)} (extendable)
 				</p>

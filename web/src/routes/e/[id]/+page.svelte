@@ -30,6 +30,7 @@
 	const d = $derived(q.data);
 
 	let duration = $state(3600);
+	let durationValid = $state(true);
 	let initialized = $state(false);
 	$effect(() => {
 		if (d && !initialized) {
@@ -126,7 +127,7 @@
 			</Section>
 
 			<Section title="Add">
-				<DurationPicker bind:value={duration} id="ext-duration" />
+				<DurationPicker bind:value={duration} bind:valid={durationValid} id="ext-duration" />
 			</Section>
 
 			<UnverifiedText text={d.extension.reason} />
@@ -137,7 +138,7 @@
 				<Button
 					size="lg"
 					class="sm:flex-1"
-					disabled={busy}
+					disabled={busy || !durationValid}
 					onclick={approve}
 					data-testid="approve-extension"
 				>

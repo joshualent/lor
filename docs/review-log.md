@@ -38,3 +38,16 @@ sudoers checks against a local Ubuntu 26.04 (OpenSSH + sudo-rs): they passed.
 | 3 | Med | Bootstrap disabled rollback before the sshd reload; uninstall committed before reloading. | **Fixed (mostly).** Install commits only after a successful reload; a failed reload restores the previous files and reloads again. Uninstall removes the drop-in, validates and reloads before committing. **Declined:** backing up agent users' home directories before `--uninstall` deletes them: those homes are scratch space for the agent, and `--uninstall` is explicitly destructive per plan section 4 (`--keep-users` exists for keeping them). |
 | 4 | Med | Adopting an existing account with `--force` overwrote its password hash, and rollback didn't restore it. | **Fixed.** The previous shadow hash is saved and restored on rollback. |
 | 5 | Med | Missing sudo/visudo/`/etc/sudoers.d` failed late (after creating users) or skipped the mandatory `visudo -cf`. | **Fixed.** Preflight requires `sudo`, `visudo` and `/etc/sudoers.d` when `agent-sudo` is wanted (with guidance to use `--no-sudo`); `visudo -cf` is no longer optional. |
+
+## Round 4: HTTP layer, CLI, frontend (c077b61..33219c8)
+
+No critical or high findings.
+
+| # | Sev | Finding | Decision |
+|---|-----|---------|----------|
+| 1 | Med | CLI startup cleanup deleted a grant's key once the cached certificate expired, even if the grant had been extended on the server. | **Fixed** (CI's integration case 15 caught the same bug in parallel). Expired local certificates are only deleted once Lor confirms the grant isn't active (or after the absolute maximum lifetime). Regression test `TestExtendedWhileIdle`. |
+| 2 | Med | `lor ssh` listed the host's whole history (capped at 100), so many newer requests could hide an active grant. | **Fixed.** Selection uses open statuses only; local keys not in that list are checked one by one (`GET /grants/{id}`) before deletion. |
+| 3 | Low | Agent API `duration_s` multiplied into `time.Duration` could overflow past the limit checks. | **Fixed.** Bounded before conversion; test added. (Admin step-up durations were already bounded.) |
+| 4 | Low | Choosing Custom with empty/invalid text kept the previous preset, so Authorize still used it. | **Fixed.** The picker reports validity; Authorize, Approve extension and Grant access are disabled until a custom duration parses. |
+| 5 | Low | Offline `lor ssh` (Lor unreachable) skipped the "less than 5 minutes left" warning. | **Fixed.** |
+| 6 | Low | Usage errors exited 1 (and `lor ssh` without a host didn't exit 255). | **Fixed.** Flag/argument errors exit 4; anything from `lor ssh` before connecting exits 255. Test added. |
