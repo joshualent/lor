@@ -272,16 +272,24 @@ func (s *State) LocalGrants() []LocalGrant {
 	return out
 }
 
-// Cleanup deletes expired grant directories (run on every invocation):
-// certificates past their end, keys that never got a certificate within a
-// day, and abandoned temporary keys.
-func (s *State) Cleanup() {
+// staleAfter bounds how long a directory with an expired local certificate
+// is kept when Lor can't confirm the grant ended (the absolute maximum
+// certificate lifetime, plus a day).
+const staleAfter = 31 * 24 * time.Hour
+
+// Cleanup deletes what is certainly dead (run on every invocation):
+// abandoned temporary keys, keys that never got a certificate within a day,
+// and certificates that expired more than staleAfter ago. It returns the
+// grants whose local certificate has expired but that may have been
+// extended on the server; the caller checks those with Lor.
+func (s *State) Cleanup() []int64 {
 	root := s.path(grantsDir)
 	entries, err := os.ReadDir(root)
 	if err != nil {
-		return
+		return nil
 	}
 	now := s.Now()
+	var expired []int64
 	for _, e := range entries {
 		p := filepath.Join(root, e.Name())
 		if strings.HasPrefix(e.Name(), ".new-") {
@@ -295,8 +303,11 @@ func (s *State) Cleanup() {
 			continue
 		}
 		if vb, ok := s.CertValidBefore(id); ok {
-			if !now.Before(vb) {
+			switch {
+			case now.Sub(vb) > staleAfter:
 				os.RemoveAll(p)
+			case !now.Before(vb):
+				expired = append(expired, id)
 			}
 			continue
 		}
@@ -304,6 +315,7 @@ func (s *State) Cleanup() {
 			os.RemoveAll(p)
 		}
 	}
+	return expired
 }
 
 // WriteSSHConfig regenerates ssh_config (one "Host lor-<host>" entry per host

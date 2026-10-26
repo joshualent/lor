@@ -78,3 +78,13 @@ Lor so no new grants are made.
 - On a target: `journalctl -u ssh` (or `/var/log/auth.log`) shows the
   certificate's key ID, e.g. `lor:g42:c57:agent=claude:host=nas:level=sudo`,
   and serial for every login, tying it back to the grant.
+
+## The agent's SSH connections are dropped ("penalty: failed authentication")
+
+OpenSSH ≥ 9.8 (Debian 13, Ubuntu 25.04+) temporarily refuses connections from
+a source address after failed logins (`PerSourcePenalties`). An agent that
+keeps retrying with an expired certificate or a planted key can lock its own
+LXC out of a host for a while. That is sshd working as intended; it clears by
+itself. If it gets in the way of legitimate use, exempt the agent LXC on that
+host in the main sshd config (not in Lor's drop-in):
+`PerSourcePenaltyExemptList 192.168.1.50`.

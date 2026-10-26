@@ -218,3 +218,33 @@ func TestInvalidRequestExitCode(t *testing.T) {
 		t.Fatalf("unknown host ssh: %d", c)
 	}
 }
+
+// An extension approved while the CLI was idle must survive the local
+// certificate's expiry: lor ssh fetches the new certificate.
+func TestExtendedWhileIdle(t *testing.T) {
+	h := newHarness(t)
+	h.e.AddHost("nas", "192.168.1.20", "sudo", false, false)
+	h.enroll("claude")
+	c, out, _ := h.run("request", "nas", "--for", "1h", "--reason", "Check the ZFS pool status and SMART data.")
+	if c != cli.ExitPending {
+		t.Fatalf("request: %d %s", c, out)
+	}
+	id := linkRe.FindStringSubmatch(out)[1]
+	var gid int64
+	json.Unmarshal([]byte(id), &gid)
+	h.e.StepUp(map[string]any{"kind": "authorize_request", "grant_id": gid, "level": "user", "duration_s": 3600})
+	if c, _, errs := h.run("ssh", "nas", "--", "true"); c != 0 {
+		t.Fatalf("ssh: %d %s", c, errs)
+	}
+	h.e.StepUp(map[string]any{"kind": "extend_grant", "grant_id": gid, "duration_s": 3600})
+	h.e.Clock.Advance(61 * time.Minute) // the local certificate has expired
+	if c, _, errs := h.run("ssh", "nas", "--", "true"); c != 0 {
+		t.Fatalf("ssh after extension: %d %s", c, errs)
+	}
+	// Once the grant really ends, the next run deletes the key.
+	h.e.Clock.Advance(61 * time.Minute)
+	h.run("status")
+	if _, err := os.Stat(filepath.Join(h.dir, "grants", id)); !os.IsNotExist(err) {
+		t.Fatal("expired grant directory not deleted")
+	}
+}

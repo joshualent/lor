@@ -99,13 +99,38 @@ func (a *App) root() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Version:       version.Version,
-		PersistentPreRun: func(*cobra.Command, []string) {
-			a.State.Cleanup()
+		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
+			a.cleanup(cmd)
 		},
 	}
 	root.CompletionOptions.DisableDefaultCmd = true
 	root.AddCommand(a.enrollCmd(), a.statusCmd(), a.hostsCmd(), a.requestCmd(), a.extendCmd(), a.sshCmd(), a.releaseCmd(), a.configPathCmd())
 	return root
+}
+
+// cleanup deletes expired grant directories. A local certificate past its
+// end may belong to a grant that was extended while the CLI wasn't running,
+// so those are only deleted once Lor confirms the grant is no longer active.
+func (a *App) cleanup(cmd *cobra.Command) {
+	expired := a.State.Cleanup()
+	if len(expired) == 0 || cmd.Name() == "enroll" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
+	defer cancel()
+	active, err := a.listGrants(ctx, "", []client.GrantStatus{client.GrantStatusActive})
+	if err != nil {
+		return // can't confirm; keep the keys for now
+	}
+	live := map[int64]bool{}
+	for _, g := range active {
+		live[g.Id] = true
+	}
+	for _, id := range expired {
+		if !live[id] {
+			a.State.RemoveGrant(id)
+		}
+	}
 }
 
 // ---------------------------------------------------------------- API client
