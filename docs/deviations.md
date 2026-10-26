@@ -137,6 +137,17 @@ exercised.
 - The one-liner uses `ssh <host-name>`; adjust it if your SSH alias differs
   (e.g. `ssh root@<ip> sh`).
 
+## Agent skill (section 12)
+
+The skill text is the plan's, with three additions from the live agent test
+(Kilo Code + a free model): name typical root-only tasks for `--sudo`
+(Docker, systemctl, package managers, root-only files); when a command fails
+because the level is too low, release and request again with `--sudo`
+instead of working around it; release as soon as you stop, even on failure.
+In that test the agent asked for user level for a Docker task, then tried
+`sudo` under a user grant (refused by sudo-rs) and ran out of steps without
+releasing.
+
 ## Tests (section 13)
 
 - **Integration tests** run the bootstrap script exactly as served by Lor's

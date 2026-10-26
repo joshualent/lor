@@ -101,3 +101,27 @@ No critical findings.
 | 1 | Med | Accepting a replacement host key kept the old server's SSH version, so the idle-timeout claim could be stale after a rebuild. | **Fixed.** Accepting a key clears the version and re-reads it with a scan that presents the newly trusted key. Test added. |
 | 2 | Med | With `agent` absent and a legacy `agent-sudo`, migration snapshotted the account files after `agent` was created, so rollback resurrected `agent`'s account without its home. | **Fixed.** Account files are snapshotted once before any account change. |
 | 3 | Low | A network filesystem mounted exactly at a scan root (e.g. NFS `/home`) wasn't pruned. | **Fixed.** Mounts equal to a scan root are pruned too. |
+
+## Live agent test (P1-10) with Kilo Code instead of OpenCode
+
+OpenCode's free tier was quota-blocked, so Kilo Code CLI 7.8.18 (official
+`@kilocode/cli-linux-x64` binary, npm integrity verified) was installed on
+the agent LXC with the free `kilo/nvidia/nemotron-3-ultra-550b-a55b:free`
+model, no account. Requests were budgeted: Kilo's per-turn step cap (6) is a
+hard limit on model requests per turn, a ledger counted every step
+(`step_finish` events), turns were refused if they could exceed a total of
+40, and any 429/quota error stopped the run. Kilo's own `kilo stats` agreed
+with the ledger: 38 requests, $0. Permissions allowed only the `lor-access`
+skill and `lor status|hosts|request|ssh|release|extend` on `vikunja`.
+
+| Scenario | Requests | Result |
+|---|---|---|
+| Probe | 1 | Free model works anonymously |
+| Approve (plan skill) | 4 + 6 | `lor status` → request → exact link, stopped. After approval only `lor ssh`, but it had asked for user level for a Docker task, tried `sudo` (refused by sudo-rs) and hit the step cap without releasing |
+| Deny | 4 + 1 | Exact link, stopped; after the deny: no retries, no other access attempts, told the user what it needed |
+| Approve (improved skill) | 4 + 5 | Asked for `--sudo` with a reason, shared link + scope, did the task with `lor ssh` only, released |
+| Extend (180 s grant) | 4 + 3 + 6 | Saw the "ends in 2m" warning, ran `lor extend`, shared the `/e/<id>` link and stopped; after approval finished the task and released |
+
+Lor itself behaved correctly in every case (approvals, command log, sudo-rs
+refusal under a user grant, extension, release). The skill text got three
+additions (see docs/deviations.md, "Agent skill").
