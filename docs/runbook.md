@@ -91,11 +91,11 @@ host in the main sshd config (not in Lor's drop-in):
 
 ## Idle sessions aren't closed after 15 minutes
 
-Expected on OpenSSH older than 10.5: it ignores `ChannelTimeout` inside
-`Match` blocks (fixed upstream in 10.5), and Lor only sets it for its own
-users. The host page shows "Idle timeout: not enforced" and the consent page
+Expected on OpenSSH older than 10.6: before 10.5 it ignores
+`ChannelTimeout` inside `Match` blocks, and 10.5 lets the session subtype
+defaults override it (fixed in 10.6). Lor only sets it for its own users. The host page shows "Idle timeout: not enforced" and the consent page
 says so. Sessions still can't be *started* after a grant ends; an open one
-lasts until it is closed. Upgrade OpenSSH on the host to 10.5+ (then Rescan
+lasts until it is closed. Upgrade OpenSSH on the host to 10.6+ (then Rescan
 key so Lor records the new version), or end sessions by hand
 (`pkill -u agent` on the host) when needed.
 

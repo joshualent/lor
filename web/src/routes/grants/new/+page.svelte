@@ -79,7 +79,7 @@
 			});
 			// Built here so the time is in the admin's zone (with UTC alongside).
 			message = res.grant?.valid_before
-				? offerChatLine(host.name, level, Date.parse(res.grant.valid_before))
+				? offerChatLine(res.grant.host.name, res.grant.level, Date.parse(res.grant.valid_before))
 				: (res.offer_message ?? null);
 			createdId = res.grant?.id ?? null;
 			toast.success(`Offer created for ${agent.name} on ${host.name}`);
@@ -108,119 +108,122 @@
 	</Section>
 {:else}
 	<form class="space-y-6" onsubmit={submit}>
-		<Section>
-			<div class="space-y-5">
-				<div class="space-y-2">
-					<Label for="agent">Agent</Label>
-					<select
-						id="agent"
-						bind:value={agentId}
-						class="h-10 w-full rounded-md border border-input bg-background px-3"
-						required
-					>
-						<option value={null} disabled>Choose an agent</option>
-						{#each usableAgents as a (a.id)}<option value={a.id}>{a.name}</option>{/each}
-					</select>
-					{#if agents.isSuccess && usableAgents.length === 0}
-						<p class="text-sm text-muted-foreground">
-							No enrolled agents yet. <a href="/agents">Add one</a>.
-						</p>
+		<!-- Locked while the passkey prompt is open: the action is already fixed. -->
+		<fieldset disabled={busy} class="contents">
+			<Section>
+				<div class="space-y-5">
+					<div class="space-y-2">
+						<Label for="agent">Agent</Label>
+						<select
+							id="agent"
+							bind:value={agentId}
+							class="h-10 w-full rounded-md border border-input bg-background px-3"
+							required
+						>
+							<option value={null} disabled>Choose an agent</option>
+							{#each usableAgents as a (a.id)}<option value={a.id}>{a.name}</option>{/each}
+						</select>
+						{#if agents.isSuccess && usableAgents.length === 0}
+							<p class="text-sm text-muted-foreground">
+								No enrolled agents yet. <a href="/agents">Add one</a>.
+							</p>
+						{/if}
+					</div>
+					<div class="space-y-2">
+						<Label for="host">Host</Label>
+						<select
+							id="host"
+							bind:value={hostId}
+							class="h-10 w-full rounded-md border border-input bg-background px-3"
+							required
+						>
+							<option value={null} disabled>Choose a host</option>
+							{#each usableHosts as h (h.id)}<option value={h.id}>{h.name} · {h.address}</option
+								>{/each}
+						</select>
+					</div>
+					{#if host?.max_level === 'sudo'}
+						<fieldset class="space-y-2">
+							<legend class="mb-2 text-sm font-medium">Level</legend>
+							<label class="flex gap-3"
+								><input
+									type="radio"
+									bind:group={level}
+									value="user"
+									class="mt-1 size-4 accent-primary"
+								/>
+								<span
+									>Standard user <span class="block text-sm text-muted-foreground"
+										>Logs in as <code>agent</code>, no sudo.</span
+									></span
+								></label
+							>
+							<label class="flex gap-3"
+								><input
+									type="radio"
+									bind:group={level}
+									value="sudo"
+									class="mt-1 size-4 accent-primary"
+								/>
+								<span
+									>sudo (root) <span class="block text-sm text-muted-foreground"
+										>Logs in as <code>agent-sudo</code>.</span
+									></span
+								></label
+							>
+						</fieldset>
 					{/if}
 				</div>
-				<div class="space-y-2">
-					<Label for="host">Host</Label>
-					<select
-						id="host"
-						bind:value={hostId}
-						class="h-10 w-full rounded-md border border-input bg-background px-3"
-						required
-					>
-						<option value={null} disabled>Choose a host</option>
-						{#each usableHosts as h (h.id)}<option value={h.id}>{h.name} · {h.address}</option
-							>{/each}
-					</select>
-				</div>
-				{#if host?.max_level === 'sudo'}
-					<fieldset class="space-y-2">
-						<legend class="mb-2 text-sm font-medium">Level</legend>
-						<label class="flex gap-3"
-							><input
-								type="radio"
-								bind:group={level}
-								value="user"
-								class="mt-1 size-4 accent-primary"
-							/>
-							<span
-								>Standard user <span class="block text-sm text-muted-foreground"
-									>Logs in as <code>agent</code>, no sudo.</span
-								></span
-							></label
-						>
-						<label class="flex gap-3"
-							><input
-								type="radio"
-								bind:group={level}
-								value="sudo"
-								class="mt-1 size-4 accent-primary"
-							/>
-							<span
-								>sudo (root) <span class="block text-sm text-muted-foreground"
-									>Logs in as <code>agent-sudo</code>.</span
-								></span
-							></label
-						>
-					</fieldset>
-				{/if}
-			</div>
-		</Section>
-
-		{#if host}<Warnings warnings={host.warnings} {level} />{/if}
-
-		<Section title="Duration">
-			<DurationPicker bind:value={duration} bind:valid={durationValid} id="offer-duration" />
-		</Section>
-
-		<Section>
-			<div class="space-y-2">
-				<Label for="note">Note (optional)</Label>
-				<Textarea
-					id="note"
-					bind:value={note}
-					rows={2}
-					maxlength={1000}
-					placeholder="What it's for"
-				/>
-			</div>
-		</Section>
-
-		{#if host && agent}
-			<Section title="Confirm">
-				<p data-testid="offer-summary">
-					{agent.name} gets <strong>{sudo ? 'sudo (root)' : 'standard user'}</strong> access to
-					<strong>{host.name}</strong> for {formatDuration(duration)}, until {formatClock(
-						endsAt,
-						clock.now
-					)}.
-				</p>
-				{#if sudo}
-					<label class="mt-4 flex items-start gap-3">
-						<Checkbox bind:checked={confirmed} id="confirm-sudo-offer" class="mt-0.5" />
-						<span>I understand this gives root on {host.name}</span>
-					</label>
-				{/if}
-				<Button
-					type="submit"
-					size="lg"
-					class="mt-4 w-full"
-					disabled={!ready}
-					data-testid="create-offer"
-				>
-					<KeyRound />
-					{busy
-						? 'Waiting for passkey…'
-						: `Grant ${sudo ? 'sudo' : 'standard user'} on ${host.name} for ${formatDuration(duration)}`}
-				</Button>
 			</Section>
-		{/if}
+
+			{#if host}<Warnings warnings={host.warnings} {level} />{/if}
+
+			<Section title="Duration">
+				<DurationPicker bind:value={duration} bind:valid={durationValid} id="offer-duration" />
+			</Section>
+
+			<Section>
+				<div class="space-y-2">
+					<Label for="note">Note (optional)</Label>
+					<Textarea
+						id="note"
+						bind:value={note}
+						rows={2}
+						maxlength={1000}
+						placeholder="What it's for"
+					/>
+				</div>
+			</Section>
+
+			{#if host && agent}
+				<Section title="Confirm">
+					<p data-testid="offer-summary">
+						{agent.name} gets <strong>{sudo ? 'sudo (root)' : 'standard user'}</strong> access to
+						<strong>{host.name}</strong> for {formatDuration(duration)}, until {formatClock(
+							endsAt,
+							clock.now
+						)}.
+					</p>
+					{#if sudo}
+						<label class="mt-4 flex items-start gap-3">
+							<Checkbox bind:checked={confirmed} id="confirm-sudo-offer" class="mt-0.5" />
+							<span>I understand this gives root on {host.name}</span>
+						</label>
+					{/if}
+					<Button
+						type="submit"
+						size="lg"
+						class="mt-4 w-full"
+						disabled={!ready}
+						data-testid="create-offer"
+					>
+						<KeyRound />
+						{busy
+							? 'Waiting for passkey…'
+							: `Grant ${sudo ? 'sudo' : 'standard user'} on ${host.name} for ${formatDuration(duration)}`}
+					</Button>
+				</Section>
+			{/if}
+		</fieldset>
 	</form>
 {/if}

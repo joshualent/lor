@@ -111,8 +111,11 @@ exercised.
 - **Removing a user ends only its SSH sessions** (processes descending from
   sshd), never other processes that happen to share the numeric UID.
 - **The idle timeout is only promised where it's enforced.** OpenSSH before
-  10.5 ignores `ChannelTimeout` inside `Match` blocks (fixed upstream in 10.5;
-  confirmed in the field test on Ubuntu 26.04's 10.2). Lor still writes the
+  10.5 ignores `ChannelTimeout` inside `Match` blocks (confirmed in the field
+  test on Ubuntu 26.04's 10.2 and by integration case 18 on Debian 13), and
+  10.5 still lets the built-in `session:shell`/`session:command` timeouts
+  override `session=15m` (fixed in 10.6). So it's treated as enforced only
+  from OpenSSH 10.6. Lor still writes the
   plan's `ChannelTimeout`/`UnusedConnectionTimeout` lines, but the bootstrap
   prints a note on affected hosts, each scan records the host's OpenSSH
   version, and the consent page's Limits say "No idle timeout" for them. No

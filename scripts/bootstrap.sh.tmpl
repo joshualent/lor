@@ -67,7 +67,9 @@ die() {
 
 BACKUP_DIR=
 CREATED_USERS=
+CREATED_GROUPS=
 ADOPTED_USERS=
+MIGRATED_HOMES=
 COMMITTED=0
 CHANGED=0
 
@@ -86,6 +88,14 @@ backup() {
 rollback() {
 	[ -n "$BACKUP_DIR" ] || return 0
 	say "rolling back"
+	# Remove users this run created before restoring the account files, so a
+	# restored /etc/passwd can't leave their homes behind.
+	for u in $CREATED_USERS; do
+		userdel -r "$u" >/dev/null 2>&1 || userdel "$u" >/dev/null 2>&1 || true
+	done
+	for g in $CREATED_GROUPS; do
+		groupdel "$g" >/dev/null 2>&1 || true
+	done
 	if [ -f "$BACKUP_DIR/files" ]; then
 		while IFS= read -r f; do
 			key=$(printf '%s' "$f" | tr '/' '_')
@@ -96,8 +106,13 @@ rollback() {
 			fi
 		done <"$BACKUP_DIR/files"
 	fi
-	for u in $CREATED_USERS; do
-		userdel -r "$u" >/dev/null 2>&1 || userdel "$u" >/dev/null 2>&1 || true
+	# Users recreated from an older install: the restored account files bring
+	# the old account back; put its home back too.
+	for h in $MIGRATED_HOMES; do
+		if [ -d "$h.lor-old.$$" ]; then
+			rm -rf "$h"
+			mv "$h.lor-old.$$" "$h"
+		fi
 	done
 	# Users adopted with --force get their previous password hash back.
 	for u in $ADOPTED_USERS; do
@@ -169,6 +184,38 @@ is_managed() { [ -f "$MANAGED" ] && grep -qx "$1" "$MANAGED"; }
 
 user_exists() { id "$1" >/dev/null 2>&1; }
 
+# scan_file_ids records every UID/GID in Lor's range that owns a file under
+# the usual data locations (once per run). It follows nested mounts (e.g. a
+# separate /var/lib/docker or application dataset) but skips network, FUSE,
+# overlay and pseudo filesystems. If ownership can't be checked, it stops:
+# Lor must not pick a UID that might own someone's data.
+scan_file_ids() {
+	[ -f "$BACKUP_DIR/file-ids" ] && return 0
+	awk '$3 ~ /^(nfs|nfs4|cifs|smb3|smbfs|9p|fuse|fuse\..*|overlay|proc|sysfs|autofs)$/ { print $2 }' /proc/mounts >"$BACKUP_DIR/prune" 2>/dev/null || : >"$BACKUP_DIR/prune"
+	: >"$BACKUP_DIR/file-ids.raw"
+	for p in /home /opt /srv /var/lib /var/opt; do
+		[ -d "$p" ] || continue
+		set -- "$p"
+		n=0
+		while IFS= read -r m; do
+			case "$m" in "$p"/*) ;; *) continue ;; esac
+			if [ "$n" -eq 0 ]; then set -- "$@" "("; else set -- "$@" -o; fi
+			set -- "$@" -path "$m"
+			n=$((n + 1))
+		done <"$BACKUP_DIR/prune"
+		[ "$n" -eq 0 ] || set -- "$@" ")" -prune -o
+		set -- "$@" "(" "(" -uid +$((LOR_UID_MIN - 1)) -uid -$((LOR_UID_MAX + 1)) ")" -o \
+			"(" -gid +$((LOR_UID_MIN - 1)) -gid -$((LOR_UID_MAX + 1)) ")" ")" -exec stat -c '%u %g' {} +
+		find "$@" >>"$BACKUP_DIR/file-ids.raw" 2>"$BACKUP_DIR/find-errors" || true
+		# Files vanishing during the walk (busy containers) are fine; any
+		# other error means ownership under $p wasn't fully checked.
+		if grep -v 'No such file or directory' "$BACKUP_DIR/find-errors" | grep -q .; then
+			die "couldn't check file ownership under $p to pick a safe UID: $(grep -v 'No such file or directory' "$BACKUP_DIR/find-errors" | head -n 1)"
+		fi
+	done
+	tr ' ' '\n' <"$BACKUP_DIR/file-ids.raw" | grep -v '^$' | sort -u >"$BACKUP_DIR/file-ids"
+}
+
 # uid_in_use N: true if an account, group, running process or file in the
 # usual data locations already uses N as a UID or GID.
 uid_in_use() {
@@ -177,10 +224,8 @@ uid_in_use() {
 	for d in /proc/[0-9]*; do
 		awk -v n="$1" '/^(Uid|Gid):/ { for (i = 2; i <= NF; i++) if ($i == n) f = 1 } END { exit !f }' "$d/status" 2>/dev/null && return 0
 	done
-	for p in /home /opt /srv /var/lib /var/opt; do
-		[ -d "$p" ] || continue
-		[ -n "$(find "$p" -xdev \( -uid "$1" -o -gid "$1" \) -print -quit 2>/dev/null)" ] && return 0
-	done
+	scan_file_ids
+	grep -qx "$1" "$BACKUP_DIR/file-ids" && return 0
 	return 1
 }
 
@@ -198,12 +243,47 @@ pick_uid() {
 
 in_lor_range() { [ "$1" -ge "$LOR_UID_MIN" ] && [ "$1" -le "$LOR_UID_MAX" ]; }
 
+# create_user makes a Lor user with a checked UID and the same, explicitly
+# allocated GID (useradd alone may pick a different, unchecked GID).
 create_user() {
 	u=$1
+	scan_file_ids
 	uid=$(pick_uid) || die "no free UID in $LOR_UID_MIN-$LOR_UID_MAX for user $u"
 	getent group "$u" >/dev/null 2>&1 && die "a group named $u already exists; remove it or adopt the account with --force"
-	useradd --create-home --shell /bin/bash --comment "Lor agent" --uid "$uid" --user-group "$u"
+	groupadd --gid "$uid" "$u"
+	CREATED_GROUPS="$CREATED_GROUPS $u"
+	useradd --create-home --shell /bin/bash --comment "Lor agent" --uid "$uid" --gid "$uid" --no-user-group "$u"
 	CREATED_USERS="$CREATED_USERS $u"
+	say "created user $u (UID $uid)"
+}
+
+# migrate_user recreates a Lor user from an older install whose UID is
+# outside Lor's range (other software, often a container's numeric user,
+# may share it). The old account files and home are kept until the run
+# commits, so a failure restores them.
+migrate_user() {
+	u=$1
+	old_uid=$(id -u "$u")
+	say "user $u has UID $old_uid, outside Lor's range $LOR_UID_MIN-$LOR_UID_MAX; recreating it"
+	for f in /etc/passwd /etc/shadow /etc/group /etc/gshadow; do
+		[ -e "$f" ] && backup "$f"
+	done
+	home=$(getent passwd "$u" | cut -d: -f6)
+	kill_user_processes "$old_uid"
+	others=$(count_uid_processes "$old_uid")
+	if [ -n "$home" ] && [ -d "$home" ]; then
+		mv "$home" "$home.lor-old.$$"
+		MIGRATED_HOMES="$MIGRATED_HOMES $home"
+	fi
+	userdel -f "$u" >/dev/null 2>&1 || userdel "$u" || die "couldn't remove the old $u account"
+	groupdel "$u" >/dev/null 2>&1 || true
+	[ "$others" -eq 0 ] || say "left $others process(es) running as UID $old_uid alone: they aren't Lor SSH sessions"
+	# The new account is restored away by the account-file backup on
+	# rollback, so it isn't tracked as created.
+	scan_file_ids
+	uid=$(pick_uid) || die "no free UID in $LOR_UID_MIN-$LOR_UID_MAX for user $u"
+	groupadd --gid "$uid" "$u"
+	useradd --create-home --shell /bin/bash --comment "Lor agent" --uid "$uid" --gid "$uid" --no-user-group "$u"
 	say "created user $u (UID $uid)"
 }
 
@@ -216,31 +296,13 @@ ensure_user() {
 			getent shadow "$u" | cut -d: -f2 >"$BACKUP_DIR/passwd.$u"
 			ADOPTED_USERS="$ADOPTED_USERS $u"
 		elif ! in_lor_range "$(id -u "$u")"; then
-			# Installed by an older Lor with a default UID that other software
-			# (often a container's numeric user) may share: recreate it.
-			old_uid=$(id -u "$u")
-			say "user $u has UID $old_uid, outside Lor's range $LOR_UID_MIN-$LOR_UID_MAX; recreating it"
-			delete_user "$u"
-			create_user "$u"
+			migrate_user "$u"
 		fi
 	else
 		create_user "$u"
 	fi
 	# '*' disables password login without "locking" the account.
 	usermod -p '*' "$u"
-}
-
-# delete_user removes an account after ending only its SSH sessions. Other
-# processes running with the same numeric UID are left alone.
-delete_user() {
-	u=$1
-	uid=$(id -u "$u")
-	kill_ssh_sessions "$uid"
-	others=$(count_uid_processes "$uid")
-	userdel -r "$u" >/dev/null 2>&1 || userdel -f -r "$u" >/dev/null 2>&1 || userdel -f "$u"
-	if [ "$others" -gt 0 ]; then
-		say "left $others process(es) running as UID $uid alone: they aren't Lor SSH sessions"
-	fi
 }
 
 remove_user() {
@@ -250,7 +312,11 @@ remove_user() {
 		say "leaving user $u alone: it wasn't created by Lor"
 		return 0
 	fi
-	delete_user "$u"
+	uid=$(id -u "$u")
+	kill_user_processes "$uid"
+	others=$(count_uid_processes "$uid")
+	userdel -r "$u" >/dev/null 2>&1 || userdel -f -r "$u" >/dev/null 2>&1 || userdel -f "$u"
+	[ "$others" -eq 0 ] || say "left $others process(es) running as UID $uid alone: they aren't Lor SSH sessions"
 	say "removed user $u"
 }
 
@@ -302,13 +368,25 @@ uid_pids() {
 	return 0
 }
 
-# kill_ssh_sessions UID ends the user's SSH sessions (processes running as
-# UID that descend from sshd), and nothing else.
-kill_ssh_sessions() {
-	for pid in $(uid_pids "$1"); do
-		if from_ssh "$pid"; then
+# kill_user_processes UID ends a Lor user's processes before it is removed.
+# UIDs in Lor's range were checked to be unused, so every process with one
+# belongs to the agent and all are ended. An older install's UID may be
+# shared with other software: then only SSH sessions (processes descending
+# from sshd) are ended. Each pass snapshots its targets before signalling,
+# so killing a parent can't hide its children.
+kill_user_processes() {
+	for _pass in 1 2 3 4 5; do
+		targets=
+		for pid in $(uid_pids "$1"); do
+			if in_lor_range "$1" || from_ssh "$pid"; then
+				targets="$targets $pid"
+			fi
+		done
+		[ -n "$targets" ] || return 0
+		for pid in $targets; do
 			kill -KILL "$pid" 2>/dev/null || true
-		fi
+		done
+		sleep 1
 	done
 	return 0
 }
@@ -393,10 +471,12 @@ if [ "$SSH_MAJOR" -lt 8 ] || { [ "$SSH_MAJOR" -eq 8 ] && [ "$SSH_MINOR" -lt 9 ];
 	die "OpenSSH $SSH_MAJOR.$SSH_MINOR is too old; Lor needs 8.9 or newer"
 fi
 NEW_TIMEOUTS=0
-# OpenSSH before 10.5 ignores ChannelTimeout inside Match blocks (fixed in
-# 10.5), so Lor's idle timeout is written but not enforced there.
+# OpenSSH before 10.5 ignores ChannelTimeout inside Match blocks, and 10.5
+# still lets the "session:shell"/"session:command" defaults override
+# "session=15m" (fixed in 10.6). So Lor's idle timeout is written but only
+# enforced from 10.6.
 TIMEOUT_ENFORCED=0
-if [ "$SSH_MAJOR" -gt 10 ] || { [ "$SSH_MAJOR" -eq 10 ] && [ "$SSH_MINOR" -ge 5 ]; }; then
+if [ "$SSH_MAJOR" -gt 10 ] || { [ "$SSH_MAJOR" -eq 10 ] && [ "$SSH_MINOR" -ge 6 ]; }; then
 	TIMEOUT_ENFORCED=1
 fi
 if [ "$SSH_MAJOR" -gt 9 ] || { [ "$SSH_MAJOR" -eq 9 ] && [ "$SSH_MINOR" -ge 2 ]; }; then
@@ -536,6 +616,9 @@ if ! reload_sshd; then
 	die "reloading sshd failed; the previous configuration was restored"
 fi
 COMMITTED=1
+for h in $MIGRATED_HOMES; do
+	rm -rf "$h.lor-old.$$"
+done
 
 if [ "$REMOVE_SUDO_USER" -eq 1 ]; then
 	remove_user agent-sudo
@@ -547,6 +630,6 @@ fi
 
 say "Lor installed on $LOR_HOST (users: $users)"
 if [ "$TIMEOUT_ENFORCED" -eq 0 ]; then
-	say "note: OpenSSH $SSH_MAJOR.$SSH_MINOR doesn't enforce ChannelTimeout for Lor's users (fixed in OpenSSH 10.5); idle sessions stay open until closed"
+	say "note: OpenSSH $SSH_MAJOR.$SSH_MINOR doesn't enforce ChannelTimeout for Lor's users (needs OpenSSH 10.6+); idle sessions stay open until closed"
 fi
 print_fingerprint

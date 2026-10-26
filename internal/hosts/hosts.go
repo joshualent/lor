@@ -157,14 +157,15 @@ func OpenSSHVersion(software string) (major, minor int, ok bool) {
 
 // IdleTimeout says whether Lor's 15-minute idle timeout (ChannelTimeout in
 // its Match block) is enforced by a host's sshd: "enforced", "unenforced"
-// (OpenSSH < 10.5 ignores ChannelTimeout in Match blocks; < 9.2 doesn't have
-// it) or "unknown".
+// or "unknown". OpenSSH < 9.2 has no ChannelTimeout, < 10.5 ignores it in
+// Match blocks, and 10.5 still lets the built-in "session:shell"/
+// "session:command" defaults override "session=15m" (fixed in 10.6).
 func IdleTimeout(software string) string {
 	major, minor, ok := OpenSSHVersion(software)
 	switch {
 	case !ok:
 		return "unknown"
-	case major > 10 || (major == 10 && minor >= 5):
+	case major > 10 || (major == 10 && minor >= 6):
 		return "enforced"
 	default:
 		return "unenforced"
@@ -410,15 +411,17 @@ func (s *Service) Rescan(ctx context.Context, actor, name string) (*ScanResult, 
 	if err != nil {
 		return nil, apierr.New(502, "scan_failed", "couldn't read the host key from %s: %v", h.Address, err)
 	}
-	if version != h.SSHVersion {
-		if err := s.db.SetHostSSHVersion(ctx, h.ID, version); err != nil {
-			return nil, err
-		}
-		h.SSHVersion = version
-	}
 	key := MarshalKey(k)
 	res := &ScanResult{Host: h, Key: key, Fingerprint: ssh.FingerprintSHA256(k)}
 	if h.HostKey == key {
+		// Only a server holding the trusted key may update what Lor claims
+		// about it (the SSH version drives the idle-timeout claim).
+		if version != h.SSHVersion {
+			if err := s.db.SetHostSSHVersion(ctx, h.ID, version); err != nil {
+				return nil, err
+			}
+			h.SSHVersion = version
+		}
 		return res, nil
 	}
 	if h.HostKey != "" {
@@ -435,6 +438,9 @@ func (s *Service) Rescan(ctx context.Context, actor, name string) (*ScanResult, 
 		if err := tx.SetFirstHostKey(ctx, h.ID, h.Address, key, s.now().Unix()); err != nil {
 			return err
 		}
+		if err := tx.SetHostSSHVersion(ctx, h.ID, version); err != nil {
+			return err
+		}
 		return audit(ctx, tx, s.now(), actor, "host.key_scanned", h.ID, map[string]any{"fingerprint": res.Fingerprint})
 	})
 	if errors.Is(err, store.ErrConflict) {
@@ -445,7 +451,7 @@ func (s *Service) Rescan(ctx context.Context, actor, name string) (*ScanResult, 
 	if err != nil {
 		return nil, err
 	}
-	h.HostKey, h.HostKeySeenAt = key, s.now().Unix()
+	h.HostKey, h.HostKeySeenAt, h.SSHVersion = key, s.now().Unix(), version
 	return res, nil
 }
 

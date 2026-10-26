@@ -48,20 +48,20 @@ func HostWarnings(h *store.Host) []Warning {
 }
 
 // Limits describes what a Lor certificate login can't do, for the consent
-// page. The idle-timeout line depends on the host's OpenSSH version: before
-// 10.5, sshd ignores ChannelTimeout inside Match blocks, so Lor's 15-minute
-// idle timeout is written but not enforced.
+// page. The idle-timeout line depends on the host's OpenSSH version (see
+// hosts.IdleTimeout): before 10.6 Lor's 15-minute idle timeout is written
+// but not enforced.
 func Limits(agent *store.Agent, host *store.Host) []string {
 	from := "any registered address"
 	if len(agent.LANAddrs) > 0 {
 		from = fmt.Sprintf("only %s", joinAddrs(agent.LANAddrs))
 	}
-	idle := "Idle timeout depends on the host's OpenSSH (enforced from 10.5); rescan the host to check"
+	idle := "Idle timeout depends on the host's OpenSSH (enforced from 10.6); rescan the host to check"
 	switch hosts.IdleTimeout(host.SSHVersion) {
 	case "enforced":
 		idle = "Idle sessions close after 15 min"
 	case "unenforced":
-		idle = fmt.Sprintf("No idle timeout: %s doesn't enforce it (needs OpenSSH 10.5+); open sessions last until closed", sshName(host.SSHVersion))
+		idle = fmt.Sprintf("No idle timeout: %s doesn't enforce it (needs OpenSSH 10.6+); open sessions last until closed", sshName(host.SSHVersion))
 	}
 	return []string{
 		"Certificate login only",

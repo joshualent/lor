@@ -166,9 +166,9 @@ PATH that doesn't include `/usr/local/bin`, so call
    others need `--force`. `agent-sudo` needs `sudo` (or sudo-rs) installed.
    The `agent` users get UIDs from 59700–59799 that no other account,
    process or data directory uses (so they never share a numeric UID with a
-   container workload). On OpenSSH older than 10.5 the script notes that the
-   15-minute idle timeout isn't enforced (an upstream bug with
-   `ChannelTimeout` in `Match` blocks); the host page and consent page say so
+   container workload). On OpenSSH older than 10.6 the script notes that the
+   15-minute idle timeout isn't enforced (upstream bugs with
+   `ChannelTimeout` in `Match` blocks, fixed in 10.5 and 10.6); the host page and consent page say so
    too.
    Validation checks the effective sshd settings for loopback and for every
    agent IP registered when the link was generated, so add agents before

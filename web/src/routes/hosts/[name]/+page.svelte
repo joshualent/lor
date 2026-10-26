@@ -213,7 +213,7 @@
 						>{h.idle_timeout === 'enforced'
 							? 'idle sessions close after 15 min'
 							: h.idle_timeout === 'unenforced'
-								? 'not enforced by this OpenSSH (needs 10.5+); sessions stay open until closed'
+								? 'not enforced by this OpenSSH (needs 10.6+); sessions stay open until closed'
 								: 'unknown'}</Row
 					>
 					{#if h.notes}<Row label="Notes"><span class="whitespace-pre-wrap">{h.notes}</span></Row

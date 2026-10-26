@@ -928,7 +928,7 @@ components:
         idle_timeout:
           type: string
           enum: [enforced, unenforced, unknown]
-          description: Whether sshd enforces Lor's 15-minute idle timeout (OpenSSH 10.5+ applies ChannelTimeout in Match blocks).
+          description: Whether sshd enforces Lor's 15-minute idle timeout (needs OpenSSH 10.6+: older versions ignore ChannelTimeout in Match blocks or let session subtypes override it).
         warnings:
           type: array
           items: { $ref: '#/components/schemas/Warning' }

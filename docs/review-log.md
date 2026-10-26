@@ -63,3 +63,33 @@ No critical findings. The reviewer reported host rename as the only missing v1 i
 | 3 | Med | CLI cleanup still trusted a capped "active" list, and deleted keys 31 days after the cached expiry without asking Lor. | **Fixed.** Every expired local grant is confirmed with `GET /grants/{id}` and deleted only if it isn't active (or doesn't exist); if Lor can't be reached, keys are kept. |
 | 4 | Low | README/deviations said Go 1.25+ but go.mod requires 1.26. | **Fixed** (docs now say 1.26+). |
 | 5 | Low | Host-name editing (plan section 11) was missing. | **Implemented.** Rename is allowed when the host has no open grants; it's audited, and the UI reminds you to re-run the bootstrap. |
+
+## Live field test (Proxmox VE 9.2, Ubuntu 26.04 LXCs): findings and fixes
+
+A separate deployment agent ran docs/field-tests.md on a live environment
+(Lor + stand-in Caddy, a Docker/Vikunja target, an OpenCode agent LXC, with
+the Proxmox firewall enabled). 27 cases: 22 pass, 4 fail, 1 skipped (OpenCode
+free-tier quota). Fixed in 2dcf9f9 and the round 6 follow-up:
+
+| Finding | Fix |
+|---|---|
+| `agent` got UID 1000 = Vikunja's container UID: it could write the app's DB, and `--uninstall` (`pkill -u agent`) killed the container | Dedicated, collision-checked UID/GID range 59700–59799; legacy users are recreated; removal never kills unrelated processes (integration case 19; re-verified live: migration and uninstall/reinstall left Vikunja untouched) |
+| Idle sessions not closed after 15 min (OpenSSH bug) | Version-aware truth in the consent Limits, host page and bootstrap output; integration case 18 compares the claim with real sshd behaviour |
+| Expired grant reported as "no access" | CLI remembers ended grants |
+| `context canceled` logged as internal errors | Quiet cancellations; internal errors logged with method/path |
+| Unlabelled, inconsistent time zones | Zone-labelled times; chat line in the admin's zone plus UTC |
+| Deployment requirements | README: Caddy ≥ 2.8, LXC nesting, `pct exec` PATH |
+
+## Round 6: field-test fixes (2dcf9f9)
+
+No critical findings.
+
+| # | Sev | Finding | Decision |
+|---|-----|---------|----------|
+| 1 | High | The UID collision scan used `find -xdev`, missing files on nested mounts (a separate `/var/lib/docker`, datasets), and treated traversal errors as "unused". | **Fixed.** One scan per run, following nested mounts (skipping network/FUSE/overlay/pseudo filesystems); any traversal error other than vanishing files stops the bootstrap. Integration case 19 puts the workload's data on a separate Docker volume. |
+| 2 | High | Recreating a legacy user deleted the old account and home before validation, so a failed run lost them. | **Fixed.** Account files are backed up and the old home moved aside until commit; rollback restores both. Case 19 forces a validation failure during migration and checks the old UID and home come back. |
+| 3 | Med | `useradd --user-group` may pick a GID other than the checked one. | **Fixed.** `groupadd --gid <checked id>` then `useradd --gid`; created groups are removed on rollback. |
+| 4 | Med | Killing SSH session processes one by one could reparent children so later ancestry checks missed them. | **Fixed.** In Lor's (unique) range every process with the UID is ended; for legacy shared UIDs each pass snapshots SSH descendants before signalling, repeated until none remain. Case 19 checks no process with the agent's UID survives. |
+| 5 | Med | OpenSSH 10.5 still lets `session:shell`/`session:command` defaults override `session=15m` (fixed in 10.6; confirmed in the 10.6 release notes). | **Fixed.** Enforcement is claimed only from OpenSSH 10.6. |
+| 6 | Med | The scanned SSH version was stored even when the scanned key was untrusted (changed), so an impostor could change the idle-timeout claim. | **Fixed.** The version is only recorded with the first (TOFU) key or a matching trusted key. Test added. |
+| 7 | Low | The offer chat line was built from form state that stayed editable during the passkey prompt. | **Fixed.** Built from the returned grant; the form is locked while submitting. |

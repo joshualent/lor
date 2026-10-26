@@ -114,6 +114,11 @@ func newEnv(t *testing.T) *env {
 		if name == "agent" {
 			args = append(args, "-v", filepath.Join(root, "bin")+":/opt/lor:ro")
 		}
+		if name == "rb" {
+			// A separately mounted data directory (like a dataset or a
+			// separate /var/lib/docker) for the UID collision checks.
+			args = append(args, "--mount", "type=volume,dst=/var/lib/appdata")
+		}
 		must(t, "docker", append(args, e.image)...)
 	}
 	for _, ip := range []string{nasIP, piholeIP, rbIP, agentIP} {

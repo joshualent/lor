@@ -414,8 +414,11 @@ func TestIntegration(t *testing.T) {
 			return pid
 		}
 		rb("rm -f /etc/ssh/sshd_config.d/10-override.conf")
-		// A data directory owned by 59700 and a "container" process as 59701.
-		rb("mkdir -p /opt/app && chown 59700:59700 /opt/app")
+		// Data owned by 59700 on a separately mounted volume, and a
+		// "container" process running as 59701.
+		if out, code := rb("mkdir -p /var/lib/appdata/db && touch /var/lib/appdata/db/app.db && chown -R 59700:59700 /var/lib/appdata/db"); code != 0 {
+			t.Fatalf("appdata: %s", out)
+		}
 		w1 := startAs("59701")
 		defer rb("kill " + w1)
 
@@ -429,6 +432,9 @@ func TestIntegration(t *testing.T) {
 			n := atoi(u)
 			if n < 59700 || n > 59799 || u == "59700" || u == "59701" {
 				t.Fatalf("Lor user got UID %s (must be in 59700-59799 and unused)", u)
+			}
+			if g, _ := rb("id -g agent"); g != uid {
+				t.Fatalf("agent's GID %s differs from its UID %s", g, uid)
 			}
 		}
 
@@ -450,6 +456,9 @@ func TestIntegration(t *testing.T) {
 		if !alive(w1) {
 			t.Fatal("uninstall killed an unrelated process")
 		}
+		if left, _ := rb("for d in /proc/[0-9]*; do awk '/^Uid:/ { print $2 }' $d/status 2>/dev/null; done | grep -cx " + uid + " || true"); left != "0" {
+			t.Fatalf("%s process(es) with the agent's UID %s survived uninstall", left, uid)
+		}
 
 		// A legacy install whose agent shares UID 4242 with a workload:
 		// uninstall leaves the workload alone.
@@ -468,10 +477,25 @@ func TestIntegration(t *testing.T) {
 		}
 
 		// Re-running the bootstrap on a legacy install moves the user to Lor's
-		// range, again without touching the workload.
-		if out, code := rb(legacy); code != 0 {
+		// range, again without touching the workload. If the run fails, the
+		// old account and its home come back.
+		if out, code := rb(legacy + " && echo keep > /home/agent/marker"); code != 0 {
 			t.Fatalf("legacy user: %s", out)
 		}
+		rb("printf 'Match User agent\\n    AuthorizedKeysFile .ssh/authorized_keys\\nMatch all\\n' > /etc/ssh/sshd_config.d/10-override.conf")
+		if out, code := e.bootstrap("rb", "rb"); code == 0 || !strings.Contains(out, "rolling back") {
+			t.Fatalf("bootstrap with override should roll back: %d\n%s", code, out)
+		}
+		if u, _ := rb("id -u agent"); u != "4242" {
+			t.Fatalf("rollback didn't restore the legacy account: id -u agent = %q", u)
+		}
+		if m, _ := rb("cat /home/agent/marker"); m != "keep" {
+			t.Fatalf("rollback didn't restore the legacy home: %q", m)
+		}
+		if !alive(w2) {
+			t.Fatal("failed migration killed the workload")
+		}
+		rb("rm -f /etc/ssh/sshd_config.d/10-override.conf")
 		out, code = e.bootstrap("rb", "rb")
 		if code != 0 || !strings.Contains(out, "outside Lor's range") {
 			t.Fatalf("migration: %d\n%s", code, out)

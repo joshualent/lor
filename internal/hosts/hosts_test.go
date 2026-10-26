@@ -20,6 +20,8 @@ import (
 	"github.com/joshualent/lor/internal/store"
 )
 
+var scanVersion = "OpenSSH_10.2p1 Ubuntu-2ubuntu3.8"
+
 func newKey() ssh.PublicKey {
 	pub, _, _ := ed25519.GenerateKey(rand.Reader)
 	k, _ := ssh.NewPublicKey(pub)
@@ -48,7 +50,7 @@ func newEnv(t *testing.T) *env {
 	e := &env{ctx: ctx, db: db, now: time.Now(), keys: map[string]ssh.PublicKey{}}
 	scan := func(_ context.Context, addr string) (ssh.PublicKey, string, error) {
 		if k, ok := e.keys[addr]; ok {
-			return k, "OpenSSH_10.2p1 Ubuntu-2ubuntu3.8", nil
+			return k, scanVersion, nil
 		}
 		return nil, "", errors.New("connection refused")
 	}
@@ -289,7 +291,8 @@ func TestRename(t *testing.T) {
 
 func TestIdleTimeoutByVersion(t *testing.T) {
 	cases := map[string]string{
-		"OpenSSH_10.5p1 Debian-1":          "enforced",
+		"OpenSSH_10.6p1 Debian-1":          "enforced",
+		"OpenSSH_10.5p1 Debian-1":          "unenforced",
 		"OpenSSH_11.0":                     "enforced",
 		"OpenSSH_10.2p1 Ubuntu-2ubuntu3.8": "unenforced",
 		"OpenSSH_9.2p1 Debian-2+deb12u3":   "unenforced",
@@ -301,5 +304,27 @@ func TestIdleTimeoutByVersion(t *testing.T) {
 		if got := IdleTimeout(in); got != want {
 			t.Errorf("IdleTimeout(%q) = %s, want %s", in, got, want)
 		}
+	}
+}
+
+// A changed (untrusted) key must not change what Lor claims about the host.
+func TestVersionOnlyFromTrustedKey(t *testing.T) {
+	e := newEnv(t)
+	e.keys["192.168.1.20"] = newKey()
+	e.svc.Create(e.ctx, "admin:x", Input{Name: "nas", Address: "192.168.1.20", MaxLevel: "sudo"})
+	h, _ := e.db.GetHostByName(e.ctx, "nas")
+	if h.SSHVersion != "OpenSSH_10.2p1 Ubuntu-2ubuntu3.8" {
+		t.Fatalf("first scan version %q", h.SSHVersion)
+	}
+	e.keys["192.168.1.20"] = newKey() // impostor with a different key
+	scanVersion = "OpenSSH_10.9p1"
+	defer func() { scanVersion = "OpenSSH_10.2p1 Ubuntu-2ubuntu3.8" }()
+	res, err := e.svc.Rescan(e.ctx, "admin:x", "nas")
+	if err != nil || !res.Changed {
+		t.Fatalf("rescan: %+v %v", res, err)
+	}
+	h, _ = e.db.GetHostByName(e.ctx, "nas")
+	if h.SSHVersion != "OpenSSH_10.2p1 Ubuntu-2ubuntu3.8" {
+		t.Fatalf("untrusted scan changed the version to %q", h.SSHVersion)
 	}
 }
