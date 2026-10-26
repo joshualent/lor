@@ -88,7 +88,11 @@
 			await call(
 				api.POST('/agents/{id}/status', { params: { path: { id: a.id } }, body: { status } })
 			);
-			toast.success(status === 'disabled' ? `${a.name} disabled` : `${a.name} enabled`);
+			toast.success(
+				status === 'disabled'
+					? `${a.name} disabled; its open grants and offers were ended`
+					: `${a.name} enabled`
+			);
 			refresh();
 		} catch (e) {
 			toast.error(errorMessage(e));

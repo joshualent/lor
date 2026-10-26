@@ -196,10 +196,10 @@ func (q q) ListHosts(ctx context.Context) ([]*Host, error) {
 	return out, rows.Err()
 }
 
-// UpdateHost writes the editable host fields (not the name or host key).
+// UpdateHost writes the editable host fields (not the host key).
 func (q q) UpdateHost(ctx context.Context, h *Host) error {
-	return affected(q.db.ExecContext(ctx, `UPDATE hosts SET address = ?, max_level = ?, hypervisor = ?, lor_infra = ?, notes = ?, disabled = ? WHERE id = ?`,
-		h.Address, h.MaxLevel, b2i(h.Hypervisor), b2i(h.LorInfra), h.Notes, b2i(h.Disabled), h.ID))
+	return affected(q.db.ExecContext(ctx, `UPDATE hosts SET name = ?, address = ?, max_level = ?, hypervisor = ?, lor_infra = ?, notes = ?, disabled = ? WHERE id = ?`,
+		h.Name, h.Address, h.MaxLevel, b2i(h.Hypervisor), b2i(h.LorInfra), h.Notes, b2i(h.Disabled), h.ID))
 }
 
 // SetFirstHostKey stores a host's first key, only while it still has none

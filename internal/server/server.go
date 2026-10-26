@@ -120,7 +120,7 @@ func (s *Server) serveBootstrap(w http.ResponseWriter, r *http.Request) {
 		fail()
 		return
 	}
-	script, err := s.opts.Hosts.RenderBootstrap(host)
+	script, err := s.opts.Hosts.RenderBootstrap(r.Context(), host)
 	if err != nil {
 		apierr.Write(w, err)
 		return

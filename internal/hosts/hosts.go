@@ -235,6 +235,7 @@ func (s *Service) Create(ctx context.Context, actor string, in Input) (h *store.
 // Update is a partial host edit. The host key is never cleared here: a new
 // address gets rescanned, and a different key needs step-up to accept.
 type Update struct {
+	Name       *string
 	Address    *string
 	MaxLevel   *string
 	Hypervisor *bool
@@ -256,6 +257,26 @@ func (s *Service) Edit(ctx context.Context, actor, name string, u Update) (*stor
 			return err
 		}
 		changes := map[string]any{}
+		if u.Name != nil && *u.Name != h.Name {
+			newName := strings.TrimSpace(*u.Name)
+			if !ca.HostNameRe.MatchString(newName) {
+				return apierr.BadRequest("invalid_name", "host name must be lowercase letters, digits and dashes (max 63); it becomes the certificate principal")
+			}
+			if _, err := tx.GetHostByName(ctx, newName); err == nil {
+				return apierr.Conflict("host_exists", "a host named %s already exists", newName)
+			}
+			// The name is the certificate principal: renaming with open grants
+			// would leave certificates and the host's principals out of step.
+			open, err := tx.ListGrants(ctx, store.GrantFilter{HostID: h.ID, Statuses: []string{store.StatusPending, store.StatusOffered, store.StatusActive}, Limit: 1})
+			if err != nil {
+				return err
+			}
+			if len(open) > 0 {
+				return apierr.Conflict("host_in_use", "end or wait out the open grants on %s before renaming it", h.Name)
+			}
+			changes["name"] = []string{h.Name, newName}
+			h.Name = newName
+		}
 		if u.Address != nil {
 			addr, err := ValidateAddress(*u.Address)
 			if err != nil {
@@ -460,11 +481,36 @@ func (s *Service) BootstrapLinks(h *store.Host) Bootstrap {
 }
 
 // RenderBootstrap renders the bootstrap script for a host.
-func (s *Service) RenderBootstrap(h *store.Host) ([]byte, error) {
+func (s *Service) RenderBootstrap(ctx context.Context, h *store.Host) ([]byte, error) {
 	if !ca.HostNameRe.MatchString(h.Name) {
 		return nil, errors.New("invalid host name")
 	}
+	addrs, err := s.agentAddrs(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var buf bytes.Buffer
-	err := bootstrapTmpl.Execute(&buf, struct{ Host, CAPub string }{h.Name, s.ca.AuthorizedKey()})
+	err = bootstrapTmpl.Execute(&buf, struct{ Host, CAPub, AgentAddrs string }{h.Name, s.ca.AuthorizedKey(), addrs})
 	return buf.Bytes(), err
+}
+
+// agentAddrs lists every registered agent LAN IP (space-separated) for the
+// bootstrap script's validation. Addresses were validated as zone-free IPs
+// on input; they're re-checked here because they go into a shell script.
+func (s *Service) agentAddrs(ctx context.Context) (string, error) {
+	agents, err := s.db.ListAgents(ctx)
+	if err != nil {
+		return "", err
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, a := range agents {
+		for _, ip := range a.LANAddrs {
+			if p, err := netip.ParseAddr(ip); err == nil && p.Zone() == "" && !seen[p.String()] {
+				seen[p.String()] = true
+				out = append(out, p.String())
+			}
+		}
+	}
+	return strings.Join(out, " "), nil
 }

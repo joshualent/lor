@@ -185,17 +185,21 @@ func TestBootstrapLinksAndRender(t *testing.T) {
 	if !strings.HasSuffix(b.Uninstall, "sudo sh -s -- --uninstall") {
 		t.Fatalf("uninstall %q", b.Uninstall)
 	}
+	e.db.CreateAgent(e.ctx, &store.Agent{Name: "claude", Status: "active", LANAddrs: []string{"192.168.1.50", "fd00::50"}, CreatedAt: 1})
 	h.MaxLevel = "sudo"
 	if b := e.svc.BootstrapLinks(h); !strings.HasSuffix(b.Install, "| ssh pihole sudo sh") {
 		t.Fatalf("sudo install %q", b.Install)
 	}
-	script, err := e.svc.RenderBootstrap(h)
+	script, err := e.svc.RenderBootstrap(e.ctx, h)
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := string(script)
 	if !strings.Contains(s, "LOR_HOST='pihole'") || !strings.Contains(s, "LOR_CA_PUB='"+e.svc.ca.AuthorizedKey()+"'") {
 		t.Fatal("script missing host or CA key")
+	}
+	if !strings.Contains(s, "LOR_AGENT_ADDRS='192.168.1.50 fd00::50'") {
+		t.Fatal("script missing agent addresses for validation")
 	}
 	if strings.Contains(s, "{{") {
 		t.Fatal("unrendered template")
@@ -247,5 +251,35 @@ func TestScanRealSSHServer(t *testing.T) {
 	}
 	if _, err := Scan(context.Background(), "127.0.0.1:1"); err == nil {
 		t.Fatal("closed port should fail")
+	}
+}
+
+func TestRename(t *testing.T) {
+	e := newEnv(t)
+	e.keys["192.168.1.20"] = newKey()
+	e.svc.Create(e.ctx, "admin:x", Input{Name: "nas", Address: "192.168.1.20", MaxLevel: "sudo"})
+	e.svc.Create(e.ctx, "admin:x", Input{Name: "pve", Address: "192.168.1.21", MaxLevel: "sudo"})
+	bad, taken, good := "NAS!", "pve", "nas2"
+	if _, err := e.svc.Edit(e.ctx, "admin:x", "nas", Update{Name: &bad}); apierr.Code(err) != "invalid_name" {
+		t.Fatalf("bad name: %v", err)
+	}
+	if _, err := e.svc.Edit(e.ctx, "admin:x", "nas", Update{Name: &taken}); apierr.Code(err) != "host_exists" {
+		t.Fatalf("taken: %v", err)
+	}
+	h, err := e.svc.Edit(e.ctx, "admin:x", "nas", Update{Name: &good})
+	if err != nil || h.Name != "nas2" || h.HostKey == "" {
+		t.Fatalf("rename: %+v %v", h, err)
+	}
+	if _, err := e.db.GetHostByName(e.ctx, "nas"); err == nil {
+		t.Fatal("old name still resolves")
+	}
+	// With an open grant, renaming is refused.
+	a := &store.Agent{Name: "claude", Status: "active", LANAddrs: []string{"192.168.1.50"}, CreatedAt: 1}
+	e.db.CreateAgent(e.ctx, a)
+	e.db.CreateGrant(e.ctx, &store.Grant{AgentID: a.ID, HostID: h.ID, Origin: "admin_offer", Level: "user", RequestedLevel: "user",
+		RequestedDurationS: 60, Status: store.StatusOffered, RequestedAt: 1, ValidAfter: 1, ValidBefore: 1 << 40})
+	back := "nas"
+	if _, err := e.svc.Edit(e.ctx, "admin:x", "nas2", Update{Name: &back}); apierr.Code(err) != "host_in_use" {
+		t.Fatalf("rename with open grant: %v", err)
 	}
 }

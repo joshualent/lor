@@ -524,3 +524,58 @@ func (s *Service) Consent(g *store.Grant, h *store.Host) *ConsentInfo {
 	}
 	return &ConsentInfo{Levels: levels, DefaultLevel: max, DefaultDuration: d, Deadline: s.ApprovalDeadline(g)}
 }
+
+// EndForAgent ends all of an agent's open grants when it is disabled:
+// active grants and offers are revoked, pending requests denied. Re-enabling
+// the agent later restores nothing without new approvals.
+func (s *Service) EndForAgent(ctx context.Context, actor string, agentID int64, why string) (int, error) {
+	open, err := s.db.ListGrants(ctx, store.GrantFilter{AgentID: agentID,
+		Statuses: []string{store.StatusPending, store.StatusOffered, store.StatusActive}})
+	if err != nil {
+		return 0, err
+	}
+	return s.endGrants(ctx, actor, open, why, true)
+}
+
+// EndForHost ends open grants a host change no longer allows: everything
+// when the host is disabled, sudo grants and offers when its max level is
+// lowered to user. Pending requests stay (they can't be authorized above the
+// new limit anyway) unless the host is disabled.
+func (s *Service) EndForHost(ctx context.Context, actor string, h *store.Host, why string) (int, error) {
+	open, err := s.db.ListGrants(ctx, store.GrantFilter{HostID: h.ID,
+		Statuses: []string{store.StatusPending, store.StatusOffered, store.StatusActive}})
+	if err != nil {
+		return 0, err
+	}
+	var affected []*store.Grant
+	for _, g := range open {
+		if h.Disabled || !LevelAtLeast(h.MaxLevel, g.Level) {
+			affected = append(affected, g)
+		}
+	}
+	return s.endGrants(ctx, actor, affected, why, h.Disabled)
+}
+
+func (s *Service) endGrants(ctx context.Context, actor string, list []*store.Grant, why string, denyPending bool) (int, error) {
+	n := 0
+	for _, g := range list {
+		var err error
+		switch g.Status {
+		case store.StatusPending:
+			if !denyPending {
+				continue
+			}
+			_, err = s.Deny(ctx, actor, g.ID, why)
+		default:
+			_, err = s.Revoke(ctx, actor, g.ID, why)
+		}
+		if apierr.Code(err) == "not_pending" || apierr.Code(err) == "not_active" {
+			continue // it ended meanwhile
+		}
+		if err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}

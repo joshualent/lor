@@ -272,16 +272,11 @@ func (s *State) LocalGrants() []LocalGrant {
 	return out
 }
 
-// staleAfter bounds how long a directory with an expired local certificate
-// is kept when Lor can't confirm the grant ended (the absolute maximum
-// certificate lifetime, plus a day).
-const staleAfter = 31 * 24 * time.Hour
-
 // Cleanup deletes what is certainly dead (run on every invocation):
-// abandoned temporary keys, keys that never got a certificate within a day,
-// and certificates that expired more than staleAfter ago. It returns the
-// grants whose local certificate has expired but that may have been
-// extended on the server; the caller checks those with Lor.
+// abandoned temporary keys and keys that never got a certificate within a
+// day. It returns the grants whose local certificate has expired; they may
+// have been extended on the server, so the caller asks Lor about each one
+// before deleting it.
 func (s *State) Cleanup() []int64 {
 	root := s.path(grantsDir)
 	entries, err := os.ReadDir(root)
@@ -303,10 +298,7 @@ func (s *State) Cleanup() []int64 {
 			continue
 		}
 		if vb, ok := s.CertValidBefore(id); ok {
-			switch {
-			case now.Sub(vb) > staleAfter:
-				os.RemoveAll(p)
-			case !now.Before(vb):
+			if !now.Before(vb) {
 				expired = append(expired, id)
 			}
 			continue

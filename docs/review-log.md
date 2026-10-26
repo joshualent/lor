@@ -51,3 +51,15 @@ No critical or high findings.
 | 4 | Low | Choosing Custom with empty/invalid text kept the previous preset, so Authorize still used it. | **Fixed.** The picker reports validity; Authorize, Approve extension and Grant access are disabled until a custom duration parses. |
 | 5 | Low | Offline `lor ssh` (Lor unreachable) skipped the "less than 5 minutes left" warning. | **Fixed.** |
 | 6 | Low | Usage errors exited 1 (and `lor ssh` without a host didn't exit 255). | **Fixed.** Flag/argument errors exit 4; anything from `lor ssh` before connecting exits 255. Test added. |
+
+## Round 5: final whole-repository review (d40b4a5)
+
+No critical findings. The reviewer reported host rename as the only missing v1 item.
+
+| # | Sev | Finding | Decision |
+|---|-----|---------|----------|
+| 1 | High | Bootstrap validated `sshd -T` only for `addr=127.0.0.1`; an earlier `Match Address <agent IP>` block setting `AuthorizedKeysFile` would pass validation yet let planted keys work for the real agent. (Reproduced by the reviewer.) | **Fixed.** The script is rendered with every registered agent IP and validates each address context. The drop-in also sets `AuthorizedKeysCommand none` / `AuthorizedPrincipalsCommand none`, and validation checks both. Integration case 11 now also covers the `Match Address` override, on all five distros. |
+| 2 | High | Re-enabling a disabled agent (no step-up) let it claim offers made earlier; host edits could likewise unblock prohibited offers. | **Fixed** by invalidation rather than more step-up: disabling an agent revokes its active grants and offers and denies pending requests; disabling a host or lowering its max level ends the grants and offers it no longer allows. Re-enabling restores nothing. Test added. |
+| 3 | Med | CLI cleanup still trusted a capped "active" list, and deleted keys 31 days after the cached expiry without asking Lor. | **Fixed.** Every expired local grant is confirmed with `GET /grants/{id}` and deleted only if it isn't active (or doesn't exist); if Lor can't be reached, keys are kept. |
+| 4 | Low | README/deviations said Go 1.25+ but go.mod requires 1.26. | **Fixed** (docs now say 1.26+). |
+| 5 | Low | Host-name editing (plan section 11) was missing. | **Implemented.** Rename is allowed when the host has no open grants; it's audited, and the UI reminds you to re-run the bootstrap. |

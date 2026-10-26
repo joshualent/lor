@@ -15,7 +15,7 @@ exact action, CSRF rules, agent text never rendered as HTML).
 | `internal/server/adminapi/` "generated interface + handlers" | Same, plus `internal/server/reqctx` (request context helpers) and `internal/tlscert` (shared by server and CLI) | Small shared packages so the generated packages, the server and the CLI don't import each other. |
 | `test/e2e/` Playwright | Specs, global setup and a tiny `fakessh` (Go) live in `test/e2e/`; the Playwright config is `web/playwright.config.ts`; `test/e2e/node_modules` is a committed symlink to `web/node_modules` | Playwright and its types are installed in `web/`; the symlink lets the specs resolve them without a second install. |
 | `lor-server` (subcommands only `admin setup-code` / `admin reset`) | `lor-server serve` runs the server | cobra command tree; `serve` keeps the `admin …` commands unambiguous. |
-| Go 1.25+ | `go 1.25.0` in go.mod; developed and CI-tested with Go 1.27 | Latest stable at the time; nothing requires > 1.25. |
+| Go 1.25+ | **Go 1.26+** (`go 1.26.0` in go.mod); developed and CI-tested with Go 1.27 | A dependency (pulled in at its current version) requires Go 1.26. |
 
 ## Data model (section 8)
 
@@ -59,6 +59,13 @@ exact action, CSRF rules, agent text never rendered as HTML).
   `lor extend` while one is pending returns the pending request (`reused`).
 - **Admin Extend also works on open offers** (it moves the offer window; no
   certificate exists yet).
+- **Disabling an agent ends its open grants and offers** (revoked; pending
+  requests denied), and **disabling a host or lowering its max level** ends
+  the grants and offers the new settings don't allow. Re-enabling restores
+  nothing by itself, so these switches needn't be step-up actions.
+- **Renaming a host** (plan section 11 "edit name") is allowed only while it
+  has no open grants; the UI reminds you to re-run the bootstrap (the
+  principals file holds the old name).
 - **API timestamps are RFC 3339**; the database stores Unix seconds.
 - **Time-based transitions are applied on read** as well as by the 30 s
   sweeper (each operation first settles the grant in its own transaction), so
@@ -90,6 +97,13 @@ startup. The agent listener stays TLS in dev mode so the CLI's pinning is
 exercised.
 
 ## Bootstrap script (section 4)
+
+- **The drop-in also sets `AuthorizedKeysCommand none` and
+  `AuthorizedPrincipalsCommand none`** for the agent users, so a host-wide
+  keys/principals command can't add another way in; validation checks both.
+- **Validation runs `sshd -T` for loopback and for every registered agent IP**
+  (rendered into the script), not only `addr=127.0.0.1`, so a pre-existing
+  `Match Address <agent IP>` block can't override Lor's settings unnoticed.
 
 - **`agent-sudo` requires `sudo`, `visudo` and `/etc/sudoers.d`** (checked in
   preflight); otherwise use `--no-sudo`. `visudo -cf` is never skipped.

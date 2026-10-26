@@ -20,6 +20,9 @@ export PATH LC_ALL=C
 
 LOR_HOST='{{.Host}}'
 LOR_CA_PUB='{{.CAPub}}'
+# Registered agent LAN IPs when this script was generated: validation checks
+# the effective sshd settings for connections from each of them.
+LOR_AGENT_ADDRS='{{.AgentAddrs}}'
 LOR_DIR=/etc/ssh/lor
 DROPIN_DIR=/etc/ssh/sshd_config.d
 DROPIN=$DROPIN_DIR/50-lor.conf
@@ -262,15 +265,22 @@ reload_sshd() {
 
 validate() {
 	sshd_bin -t || die "sshd -t failed"
+	# Check the effective settings for every connection context an agent can
+	# use (loopback plus each registered agent IP), so an earlier
+	# "Match Address ..." block can't quietly override Lor's.
 	for u in "$@"; do
-		out=$(sshd_bin -T -C "user=$u,host=lor-validate,addr=127.0.0.1" 2>&1) || die "sshd -T failed for $u: $out"
-		for want in \
-			"authorizedkeysfile none" \
-			"trustedusercakeys $LOR_DIR/ca.pub" \
-			"authorizedprincipalsfile $LOR_DIR/principals/%u" \
-			"passwordauthentication no"; do
-			printf '%s\n' "$out" | grep -qix "$want" ||
-				die "validation failed for user $u: sshd -T doesn't show '$want' (another sshd setting overrides Lor's)"
+		for addr in 127.0.0.1 $LOR_AGENT_ADDRS; do
+			out=$(sshd_bin -T -C "user=$u,host=lor-validate,addr=$addr" 2>&1) || die "sshd -T failed for $u from $addr: $out"
+			for want in \
+				"authorizedkeysfile none" \
+				"authorizedkeyscommand none" \
+				"authorizedprincipalscommand none" \
+				"trustedusercakeys $LOR_DIR/ca.pub" \
+				"authorizedprincipalsfile $LOR_DIR/principals/%u" \
+				"passwordauthentication no"; do
+				printf '%s\n' "$out" | grep -qix "$want" ||
+					die "validation failed for user $u from $addr: sshd -T doesn't show '$want' (another sshd setting overrides Lor's)"
+			done
 		done
 	done
 }
@@ -404,6 +414,8 @@ managed_list $users | write_file "$MANAGED" 0644
 	echo "    TrustedUserCAKeys $LOR_DIR/ca.pub"
 	echo "    AuthorizedPrincipalsFile $LOR_DIR/principals/%u"
 	echo "    AuthorizedKeysFile none"
+	echo "    AuthorizedKeysCommand none"
+	echo "    AuthorizedPrincipalsCommand none"
 	echo "    PasswordAuthentication no"
 	echo "    KbdInteractiveAuthentication no"
 	echo "    DisableForwarding yes"

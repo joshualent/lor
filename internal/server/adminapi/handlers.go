@@ -613,7 +613,7 @@ func (h *Handlers) GetHost(ctx context.Context, req GetHostRequestObject) (GetHo
 // UpdateHost edits a host.
 func (h *Handlers) UpdateHost(ctx context.Context, req UpdateHostRequestObject) (UpdateHostResponseObject, error) {
 	b := req.Body
-	u := hosts.Update{Address: b.Address, Hypervisor: b.Hypervisor, LorInfra: b.LorInfra, Notes: b.Notes, Disabled: b.Disabled}
+	u := hosts.Update{Name: b.Name, Address: b.Address, Hypervisor: b.Hypervisor, LorInfra: b.LorInfra, Notes: b.Notes, Disabled: b.Disabled}
 	if b.MaxLevel != nil {
 		l := string(*b.MaxLevel)
 		u.MaxLevel = &l
@@ -621,6 +621,17 @@ func (h *Handlers) UpdateHost(ctx context.Context, req UpdateHostRequestObject) 
 	host, err := h.Hosts.Edit(ctx, actor(ctx), req.Name, u)
 	if err != nil {
 		return nil, err
+	}
+	// End open grants and offers the new settings no longer allow, so
+	// re-enabling or raising the level later restores nothing by itself.
+	if host.Disabled || host.MaxLevel != "sudo" {
+		why := "host restricted to standard user"
+		if host.Disabled {
+			why = "host disabled"
+		}
+		if _, err := h.Grants.EndForHost(ctx, actor(ctx), host, why); err != nil {
+			return nil, err
+		}
 	}
 	return UpdateHost200JSONResponse(h.hostDetail(host, "")), nil
 }
@@ -686,6 +697,11 @@ func (h *Handlers) SetAgentStatus(ctx context.Context, req SetAgentStatusRequest
 	a, err := h.Agents.SetStatus(ctx, actor(ctx), req.Id, string(req.Body.Status))
 	if err != nil {
 		return nil, err
+	}
+	if a.Status == "disabled" {
+		if _, err := h.Grants.EndForAgent(ctx, actor(ctx), a.ID, "agent disabled"); err != nil {
+			return nil, err
+		}
 	}
 	return SetAgentStatus200JSONResponse(agentView(a)), nil
 }

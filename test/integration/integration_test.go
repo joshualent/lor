@@ -215,39 +215,45 @@ func TestIntegration(t *testing.T) {
 
 	// ---- 11. Rollback on validation failure leaves sshd working.
 	t.Run("11_rollback_on_validation_failure", func(t *testing.T) {
-		// A pre-existing Match block that overrides Lor's AuthorizedKeysFile:
-		// validation (sshd -T) must catch it and roll everything back.
-		override := "Match User agent\n    AuthorizedKeysFile .ssh/authorized_keys\nMatch all\n"
-		_, errOut, code := e.exec("rb", []byte(override), "sh", "-c", "cat > /etc/ssh/sshd_config.d/10-override.conf")
-		if code != 0 {
-			t.Fatal(errOut)
-		}
-		cfgBefore, _, _ := e.exec("rb", nil, "cat", "/etc/ssh/sshd_config")
-		out, code := e.bootstrap("rb", "rb")
-		if code == 0 {
-			t.Fatalf("bootstrap should fail validation:\n%s", out)
-		}
-		if !strings.Contains(out, "validation failed") || !strings.Contains(out, "rolling back") {
-			t.Fatalf("unexpected output:\n%s", out)
-		}
-		for _, f := range []string{"/etc/ssh/sshd_config.d/50-lor.conf", "/etc/ssh/lor", "/etc/sudoers.d/50-lor-agent"} {
-			if _, _, code := e.exec("rb", nil, "test", "-e", f); code == 0 {
-				t.Errorf("%s left behind after rollback", f)
+		// Pre-existing Match blocks that override Lor's AuthorizedKeysFile:
+		// validation (sshd -T, for every agent address) must catch them and
+		// roll everything back.
+		for _, override := range []string{
+			"Match User agent\n    AuthorizedKeysFile .ssh/authorized_keys\nMatch all\n",
+			// Only applies to connections from the agent's IP, not loopback.
+			"Match Address " + agentIP + "\n    AuthorizedKeysFile .ssh/authorized_keys\nMatch all\n",
+		} {
+			_, errOut, code := e.exec("rb", []byte(override), "sh", "-c", "cat > /etc/ssh/sshd_config.d/10-override.conf")
+			if code != 0 {
+				t.Fatal(errOut)
 			}
-		}
-		for _, u := range []string{"agent", "agent-sudo"} {
-			if _, _, code := e.exec("rb", nil, "id", u); code == 0 {
-				t.Errorf("user %s left behind after rollback", u)
+			cfgBefore, _, _ := e.exec("rb", nil, "cat", "/etc/ssh/sshd_config")
+			out, code := e.bootstrap("rb", "rb")
+			if code == 0 {
+				t.Fatalf("bootstrap should fail validation with override %q:\n%s", override, out)
 			}
+			if !strings.Contains(out, "validation failed") || !strings.Contains(out, "rolling back") {
+				t.Fatalf("unexpected output:\n%s", out)
+			}
+			for _, f := range []string{"/etc/ssh/sshd_config.d/50-lor.conf", "/etc/ssh/lor", "/etc/sudoers.d/50-lor-agent"} {
+				if _, _, code := e.exec("rb", nil, "test", "-e", f); code == 0 {
+					t.Errorf("%s left behind after rollback", f)
+				}
+			}
+			for _, u := range []string{"agent", "agent-sudo"} {
+				if _, _, code := e.exec("rb", nil, "id", u); code == 0 {
+					t.Errorf("user %s left behind after rollback", u)
+				}
+			}
+			cfgAfter, _, _ := e.exec("rb", nil, "cat", "/etc/ssh/sshd_config")
+			if cfgBefore != cfgAfter {
+				t.Error("sshd_config changed after rollback")
+			}
+			if _, errOut, code := e.exec("rb", nil, "/usr/sbin/sshd", "-t"); code != 0 {
+				t.Fatalf("sshd -t fails after rollback: %s", errOut)
+			}
+			waitSSH(t, rbIP)
 		}
-		cfgAfter, _, _ := e.exec("rb", nil, "cat", "/etc/ssh/sshd_config")
-		if cfgBefore != cfgAfter {
-			t.Error("sshd_config changed after rollback")
-		}
-		if _, errOut, code := e.exec("rb", nil, "/usr/sbin/sshd", "-t"); code != 0 {
-			t.Fatalf("sshd -t fails after rollback: %s", errOut)
-		}
-		waitSSH(t, rbIP)
 	})
 
 	// ---- 12. CLI request flow.

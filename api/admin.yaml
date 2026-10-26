@@ -955,6 +955,9 @@ components:
     HostUpdate:
       type: object
       properties:
+        name:
+          type: string
+          description: Renames the host (its certificate principal). Only allowed with no open grants; re-run the bootstrap afterwards.
         address: { type: string }
         max_level: { $ref: '#/components/schemas/Level' }
         hypervisor: { type: boolean }

@@ -618,3 +618,43 @@ func TestDurationOverflowRejected(t *testing.T) {
 		t.Fatalf("overflowing duration: %d %s", r.Code, r.Body)
 	}
 }
+
+// Disabling an agent or restricting a host ends its open grants and offers,
+// so re-enabling can't restore certificate issuance without a new tap.
+func TestDisableEndsOpenGrants(t *testing.T) {
+	e := testenv.New(t)
+	e.Setup()
+	hostID := e.AddHost("nas", "192.168.1.20", "sudo", false, false)
+	agentID, token := e.AddAgent("claude", testenv.AgentIP)
+	offer := func(level string) int64 {
+		var out struct{ Grant struct{ ID int64 } }
+		e.StepUp(map[string]any{"kind": "create_offer", "agent_id": agentID, "host_id": hostID, "level": level, "duration_s": 3600, "confirm_sudo": level == "sudo"}).JSON(t, &out)
+		return out.Grant.ID
+	}
+	status := func(id int64) string {
+		var g struct{ Status string }
+		e.AdminDo("GET", "/api/admin/v1/grants/"+jsonNum(id), nil).JSON(t, &g)
+		return g.Status
+	}
+	id := offer("user")
+	e.AdminDo("POST", "/api/admin/v1/agents/"+jsonNum(agentID)+"/status", map[string]any{"status": "disabled"})
+	e.AdminDo("POST", "/api/admin/v1/agents/"+jsonNum(agentID)+"/status", map[string]any{"status": "active"})
+	if st := status(id); st != "revoked" {
+		t.Fatalf("offer after disable/enable: %s", st)
+	}
+	r := e.AgentDo(testenv.AgentIP, token, "POST", "/api/v1/grants/"+jsonNum(id)+"/claim", map[string]any{"public_key": testenv.NewPublicKey()})
+	if r.Code == 200 {
+		t.Fatal("offer claimable after re-enabling the agent")
+	}
+
+	sudo := offer("sudo")
+	user := offer("user")
+	e.AdminDo("PATCH", "/api/admin/v1/hosts/nas", map[string]any{"max_level": "user"})
+	if status(sudo) != "revoked" || status(user) != "offered" {
+		t.Fatalf("after lowering max level: sudo=%s user=%s", status(sudo), status(user))
+	}
+	e.AdminDo("PATCH", "/api/admin/v1/hosts/nas", map[string]any{"disabled": true})
+	if status(user) != "revoked" {
+		t.Fatalf("after disabling the host: %s", status(user))
+	}
+}

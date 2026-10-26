@@ -498,7 +498,10 @@ type HostUpdate struct {
 	Hypervisor *bool   `json:"hypervisor,omitempty"`
 	LorInfra   *bool   `json:"lor_infra,omitempty"`
 	MaxLevel   *Level  `json:"max_level,omitempty"`
-	Notes      *string `json:"notes,omitempty"`
+
+	// Name Renames the host (its certificate principal). Only allowed with no open grants; re-run the bootstrap afterwards.
+	Name  *string `json:"name,omitempty"`
+	Notes *string `json:"notes,omitempty"`
 }
 
 // Level defines model for Level.

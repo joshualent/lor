@@ -135,24 +135,28 @@ func (a *App) root() *cobra.Command {
 
 // cleanup deletes expired grant directories. A local certificate past its
 // end may belong to a grant that was extended while the CLI wasn't running,
-// so those are only deleted once Lor confirms the grant is no longer active.
+// so each one is deleted only once Lor confirms that grant is no longer
+// active (or doesn't exist). If Lor can't be reached, the keys are kept.
 func (a *App) cleanup(cmd *cobra.Command) {
 	expired := a.State.Cleanup()
 	if len(expired) == 0 || cmd.Name() == "enroll" {
 		return
 	}
-	ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
-	defer cancel()
-	active, err := a.listGrants(ctx, "", []client.GrantStatus{client.GrantStatusActive})
+	c, _, err := a.api()
 	if err != nil {
-		return // can't confirm; keep the keys for now
+		return
 	}
-	live := map[int64]bool{}
-	for _, g := range active {
-		live[g.Id] = true
-	}
+	ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
+	defer cancel()
 	for _, id := range expired {
-		if !live[id] {
+		res, err := c.GetGrantWithResponse(ctx, id, nil)
+		if err != nil {
+			return // can't confirm; keep the keys for now
+		}
+		switch {
+		case res.JSON200 != nil && res.JSON200.Status == client.GrantStatusActive:
+			// Extended on the server; lor ssh fetches the new certificate.
+		case res.JSON200 != nil, res.StatusCode() == http.StatusNotFound:
 			a.State.RemoveGrant(id)
 		}
 	}

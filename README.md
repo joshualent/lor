@@ -38,7 +38,7 @@ The full design is in [docs/plan.md](docs/plan.md). Deviations from it are in
 
 ## Building
 
-Needs Go 1.25+ and Node 22 with pnpm (Node is only needed at build time).
+Needs Go 1.26+ and Node 22 with pnpm (Node is only needed at build time).
 
 ```sh
 make build          # web UI → web/build, then CGO_ENABLED=0 go build → bin/lor-server, bin/lor
@@ -155,6 +155,9 @@ Lor runs in its own small LXC (the plan uses an Ubuntu 26.04 LXC on the NAS:
    with Lor's. If anything fails it restores the previous state. Tier 1:
    Proxmox VE 8/9, Debian 12/13, Ubuntu 22.04/24.04/26.04 (OpenSSH ≥ 8.9);
    others need `--force`. `agent-sudo` needs `sudo` (or sudo-rs) installed.
+   Validation checks the effective sshd settings for loopback and for every
+   agent IP registered when the link was generated, so add agents before
+   bootstrapping (or re-run the bootstrap after adding one).
 
 ### Enrolling an agent
 

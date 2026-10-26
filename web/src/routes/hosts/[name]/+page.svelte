@@ -1,5 +1,6 @@
 <script lang="ts">
 	import KeyRound from '@lucide/svelte/icons/key-round';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
@@ -32,6 +33,7 @@
 
 	let editing = $state(false);
 	let form = $state({
+		name: '',
 		address: '',
 		max_level: 'sudo' as Level,
 		hypervisor: false,
@@ -42,6 +44,7 @@
 	function startEdit() {
 		if (!h) return;
 		form = {
+			name: h.name,
 			address: h.address,
 			max_level: h.max_level,
 			hypervisor: h.hypervisor,
@@ -62,10 +65,21 @@
 	async function save() {
 		busy = true;
 		try {
-			await call(api.PATCH('/hosts/{name}', { params: { path: { name } }, body: form }));
-			toast.success('Saved');
+			const res = await call(
+				api.PATCH('/hosts/{name}', { params: { path: { name } }, body: form })
+			);
 			editing = false;
 			refresh();
+			if (res.host.name !== name) {
+				// The name is the certificate principal: the host's principals file
+				// still has the old one until the bootstrap runs again.
+				toast.success(`Renamed to ${res.host.name}. Re-run the bootstrap one-liner on the host.`, {
+					duration: 10_000
+				});
+				await goto(`/hosts/${res.host.name}`, { replaceState: true });
+			} else {
+				toast.success('Saved');
+			}
 		} catch (e) {
 			toast.error(errorMessage(e));
 		} finally {
@@ -133,6 +147,18 @@
 				>
 					<div class="space-y-2">
 						<Label for="addr">LAN IP</Label><Input id="addr" bind:value={form.address} required />
+					</div>
+					<div class="space-y-2">
+						<Label for="host-name">Name</Label><Input
+							id="host-name"
+							bind:value={form.name}
+							autocapitalize="off"
+							autocomplete="off"
+							required
+						/>
+						<p class="text-sm text-muted-foreground">
+							The certificate principal. Renaming needs no open grants and a fresh bootstrap run.
+						</p>
 					</div>
 					<fieldset class="space-y-2">
 						<legend class="mb-1 text-sm font-medium">Most access allowed</legend>

@@ -752,6 +752,8 @@ export interface components {
             notes?: string;
         };
         HostUpdate: {
+            /** @description Renames the host (its certificate principal). Only allowed with no open grants; re-run the bootstrap afterwards. */
+            name?: string;
             address?: string;
             max_level?: components["schemas"]["Level"];
             hypervisor?: boolean;
