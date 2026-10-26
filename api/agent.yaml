@@ -342,6 +342,9 @@ components:
         certificate_serial: { type: integer, format: int64 }
         ssh: { $ref: '#/components/schemas/SSHInfo' }
         pending_extension: { $ref: '#/components/schemas/ExtensionRequest' }
+        latest_extension:
+          $ref: '#/components/schemas/ExtensionRequest'
+          description: The most recent extension request (any status), so `lor extend --wait` can report its outcome.
     SSHInfo:
       type: object
       required: [hostname, port, user, known_hosts_line, host_key_alias]

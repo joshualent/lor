@@ -154,8 +154,12 @@ func (s *Service) claim(ctx context.Context, tx *store.Tx, agent *store.Agent, g
 	if g.Status != store.StatusOffered {
 		return apierr.Conflict("not_offered", "grant %d is %s, not an open offer", g.ID, g.Status)
 	}
-	if _, err := s.requestableHost(ctx, tx, g.HostID); err != nil {
+	h, err := s.requestableHost(ctx, tx, g.HostID)
+	if err != nil {
 		return err
+	}
+	if !LevelAtLeast(h.MaxLevel, g.Level) {
+		return apierr.BadRequest("level_not_allowed", "host %s now allows at most %s access; ask for a new grant", h.Name, h.MaxLevel)
 	}
 	from := g.Status
 	g.PublicKey, g.PublicKeyFP = pubKey, ssh.FingerprintSHA256(pk)
@@ -252,40 +256,33 @@ func (s *Service) WaitAgentGrant(ctx context.Context, agent *store.Agent, id int
 	}
 }
 
-// ListAgentGrants returns the agent's grants, settled.
+// ListAgentGrants returns the agent's grants (newest first, at most 100),
+// settling open grants first so the status filter sees effective states.
 func (s *Service) ListAgentGrants(ctx context.Context, agent *store.Agent, host string, statuses []string) ([]*store.Grant, error) {
-	var out []*store.Grant
-	err := s.db.WithTx(ctx, func(tx *store.Tx) error {
-		f := store.GrantFilter{AgentID: agent.ID, Limit: 100}
-		if host != "" {
-			h, err := tx.GetHostByName(ctx, host)
-			if errors.Is(err, store.ErrNotFound) {
-				return nil
-			}
-			if err != nil {
-				return err
-			}
-			f.HostID = h.ID
+	if err := s.settleAgent(ctx, agent.ID); err != nil {
+		return nil, err
+	}
+	f := store.GrantFilter{AgentID: agent.ID, Limit: 100, Statuses: statuses}
+	if host != "" {
+		h, err := s.db.GetHostByName(ctx, host)
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, nil
 		}
-		list, err := tx.ListGrants(ctx, f)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		want := map[string]bool{}
-		for _, st := range statuses {
-			want[st] = true
-		}
-		for _, g := range list {
-			if err := s.settle(ctx, tx, g); err != nil {
-				return err
-			}
-			if len(want) == 0 || want[g.Status] {
-				out = append(out, g)
-			}
-		}
-		return nil
-	})
-	return out, err
+		f.HostID = h.ID
+	}
+	return s.db.ListGrants(ctx, f)
+}
+
+// LatestExtension returns the grant's most recent extension request, if any.
+func (s *Service) LatestExtension(ctx context.Context, grantID int64) (*store.ExtensionRequest, error) {
+	exts, err := s.db.ListExtensions(ctx, grantID, "")
+	if err != nil || len(exts) == 0 {
+		return nil, err
+	}
+	return exts[len(exts)-1], nil
 }
 
 // Connect records a command reported by `lor ssh` and returns the grant's

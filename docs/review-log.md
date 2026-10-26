@@ -15,3 +15,13 @@ No critical or high findings.
 | 3 | Low | `time.Sub` saturates, so a huge `absolute_max_duration` let a year-9999 `ValidBefore` pass. | **Fixed** in `SignUserCert`, `CheckCert` and the grants-layer check: compare `ValidBefore` with `now.Add(max)`. Test added. |
 | 4 | Low | Fractional Go durations (`1.5h`) rejected. | **Fixed.** Plain Go durations go straight to `time.ParseDuration`; mixed forms accept fractional Go units. |
 | 5 | Low | `public_url` accepted query/fragment/userinfo, breaking approval links. | **Fixed.** Rejected; `public_url` is normalized to scheme + host. |
+
+## Round 2: grants state machine, store, API specs (commit d35f782)
+
+No critical or high findings.
+
+| # | Sev | Finding | Decision |
+|---|-----|---------|----------|
+| 1 | Med | Host `max_level` not rechecked when a sudo offer is claimed or a sudo grant extended after the host was lowered to `user`. | **Fixed.** Claim and every extend path (admin extend, approve extension, and their step-up `Check*`) refuse with `level_not_allowed`. Test added. |
+| 2 | Med | `ListAgentGrants` limited to 100 rows before filtering by status, so many denied requests could hide an active grant from the CLI. | **Fixed.** Open grants are settled first, then the status filter is applied in SQL before the limit. Test with 105 denied requests added. |
+| 3 | Med | Agents couldn't see a decided extension's outcome, so `lor extend --wait` couldn't tell denial from timeout. | **Fixed.** Agent `Grant` has `latest_extension` (any status); `lor extend --wait` follows its extension request and exits 0 / 2 (denied, with note) / 3 (timed out or moot). |

@@ -246,6 +246,7 @@ type Grant struct {
 	DecisionNote      *string           `json:"decision_note,omitempty"`
 	Host              string            `json:"host"`
 	Id                int64             `json:"id"`
+	LatestExtension   *ExtensionRequest `json:"latest_extension,omitempty"`
 	Level             Level             `json:"level"`
 	Origin            GrantOrigin       `json:"origin"`
 	PendingExtension  *ExtensionRequest `json:"pending_extension,omitempty"`

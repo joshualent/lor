@@ -293,17 +293,20 @@ func (s *Service) checkExtend(ctx context.Context, tx *store.Tx, in ExtendInput)
 	if err := s.checkAbsoluteMax(g.ValidBefore + int64(in.Duration/time.Second)); err != nil {
 		return nil, err
 	}
-	if g.Status == store.StatusActive {
-		agent, err := tx.GetAgent(ctx, g.AgentID)
-		if err != nil {
-			return nil, err
-		}
-		if err := activeAgent(agent); err != nil {
-			return nil, err
-		}
-		if _, err := s.requestableHost(ctx, tx, g.HostID); err != nil {
-			return nil, err
-		}
+	agent, err := tx.GetAgent(ctx, g.AgentID)
+	if err != nil {
+		return nil, err
+	}
+	if err := activeAgent(agent); err != nil {
+		return nil, err
+	}
+	h, err := s.requestableHost(ctx, tx, g.HostID)
+	if err != nil {
+		return nil, err
+	}
+	// The host's max level may have been lowered since the grant was made.
+	if !LevelAtLeast(h.MaxLevel, g.Level) {
+		return nil, apierr.BadRequest("level_not_allowed", "host %s now allows at most %s access; this %s grant can't be extended", h.Name, h.MaxLevel, g.Level)
 	}
 	return g, nil
 }

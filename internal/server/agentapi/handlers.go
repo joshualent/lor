@@ -88,6 +88,14 @@ func (h *Handlers) grant(ctx context.Context, g *store.Grant) (Grant, error) {
 		out.ApprovalUrl = &u
 		d := h.Grants.ApprovalDeadline(g).UTC()
 		out.ApprovalDeadline = &d
+	}
+	if latest, err := h.Grants.LatestExtension(ctx, g.ID); err != nil {
+		return Grant{}, err
+	} else if latest != nil {
+		e := h.extension(latest)
+		out.LatestExtension = &e
+	}
+	switch g.Status {
 	case store.StatusActive:
 		cert, err := h.DB.LatestCertificate(ctx, g.ID)
 		if err != nil {

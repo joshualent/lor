@@ -601,11 +601,13 @@ func (a *App) extendCmd() *cobra.Command {
 			if !wait {
 				return exitf(ExitPending, "")
 			}
-			before := g.ValidBefore
 			waitS := 60
 			for {
 				r, err := c.GetGrantWithResponse(cmd.Context(), g.Id, &client.GetGrantParams{Wait: &waitS})
 				if err != nil {
+					if cmd.Context().Err() != nil {
+						return cmd.Context().Err()
+					}
 					time.Sleep(3 * time.Second)
 					continue
 				}
@@ -613,20 +615,28 @@ func (a *App) extendCmd() *cobra.Command {
 					return exitFor(asAPIError(r.StatusCode(), r.JSONDefault, r.Body))
 				}
 				ng := *r.JSON200
-				if ng.Status == client.GrantStatusActive && ng.PendingExtension != nil {
-					continue
+				x := ng.LatestExtension
+				if x == nil || x.Id != ext.Id {
+					return exitf(ExitError, "lost track of extension request %d", ext.Id)
 				}
-				if ng.Status == client.GrantStatusActive && ng.ValidBefore != nil && before != nil && ng.ValidBefore.After(*before) {
+				switch x.Status {
+				case client.ExtensionStatusPending:
+					continue
+				case client.ExtensionStatusApproved:
 					if err := a.install(ng); err != nil {
 						return err
 					}
 					fmt.Fprintf(a.Out, "Extended: %s %s\n", host, until(ng.ValidBefore, a.Now()))
 					return nil
+				case client.ExtensionStatusDenied:
+					note := ""
+					if x.DecisionNote != nil {
+						note = ": " + *x.DecisionNote
+					}
+					return exitf(ExitDenied, "the extension was denied%s", note)
+				default:
+					return exitf(ExitExpired, "the extension request ended without approval (%s)", x.Status)
 				}
-				if ng.Status != client.GrantStatusActive {
-					return exitf(ExitExpired, "the grant ended (%s) before the extension was approved", ng.Status)
-				}
-				return exitf(ExitDenied, "the extension was not approved")
 			}
 		},
 	}

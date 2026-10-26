@@ -687,3 +687,34 @@ func TestHostKeyRequired(t *testing.T) {
 	_, err := e.svc.Request(e.ctx, e.agent, RequestInput{Host: "pihole", Level: "user", Reason: reason, PublicKey: newPub(t)})
 	wantCode(t, err, "host_key_missing")
 }
+
+func TestHostMaxLevelRecheckedOnClaimAndExtend(t *testing.T) {
+	e := newEnv(t)
+	g := e.active("nas", "sudo", time.Hour)
+	offer, _, err := e.svc.CreateOffer(e.ctx, admin, OfferInput{AgentID: e.agent.ID, HostID: e.nas.ID, Level: "sudo", Duration: time.Hour, ConfirmSudo: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.nas.MaxLevel = "user"
+	e.db.UpdateHost(e.ctx, e.nas)
+	_, err = e.svc.Claim(e.ctx, e.agent, offer.ID, newPub(t))
+	wantCode(t, err, "level_not_allowed")
+	_, err = e.svc.Extend(e.ctx, admin, ExtendInput{GrantID: g.ID, Duration: time.Hour})
+	wantCode(t, err, "level_not_allowed")
+	ext, _, _ := e.svc.RequestExtension(e.ctx, e.agent, g.ID, time.Hour, "Scrub still running, need more time.")
+	_, _, err = e.svc.ApproveExtension(e.ctx, admin, ApproveExtensionInput{ExtensionID: ext.ID, Duration: time.Hour})
+	wantCode(t, err, "level_not_allowed")
+}
+
+func TestListAgentGrantsFiltersBeforeLimit(t *testing.T) {
+	e := newEnv(t)
+	g := e.active("pihole", "user", time.Hour)
+	for i := 0; i < 105; i++ {
+		r := e.request("nas", "user", time.Hour)
+		e.svc.Deny(e.ctx, admin, r.Grant.ID, "")
+	}
+	list, err := e.svc.ListAgentGrants(e.ctx, e.agent, "", []string{store.StatusActive})
+	if err != nil || len(list) != 1 || list[0].ID != g.ID {
+		t.Fatalf("active grant hidden: %d %v", len(list), err)
+	}
+}
