@@ -202,6 +202,13 @@ func (q q) UpdateHost(ctx context.Context, h *Host) error {
 		h.Address, h.MaxLevel, b2i(h.Hypervisor), b2i(h.LorInfra), h.Notes, b2i(h.Disabled), h.ID))
 }
 
+// SetFirstHostKey stores a host's first key, only while it still has none
+// and its address is unchanged (concurrent scans can't overwrite each other).
+func (q q) SetFirstHostKey(ctx context.Context, id int64, address, key string, seenAt int64) error {
+	return affected(q.db.ExecContext(ctx, `UPDATE hosts SET host_key = ?, host_key_seen_at = ? WHERE id = ? AND host_key IS NULL AND address = ?`,
+		key, seenAt, id, address))
+}
+
 // SetHostKey stores a scanned host key.
 func (q q) SetHostKey(ctx context.Context, id int64, key string, seenAt int64) error {
 	return affected(q.db.ExecContext(ctx, `UPDATE hosts SET host_key = ?, host_key_seen_at = ? WHERE id = ?`, nullStr(key), nullInt(seenAt), id))

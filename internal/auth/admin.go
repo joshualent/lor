@@ -676,13 +676,25 @@ func (a *Admin) CheckRemovePasskey(ctx context.Context, id int64) (*store.Passke
 	return p, nil
 }
 
-// RemovePasskey deletes a passkey and its sessions (after step-up).
+// RemovePasskey deletes a passkey and its sessions (after step-up). The
+// checks run inside the deleting transaction, so two concurrent removals
+// can't leave zero passkeys.
 func (a *Admin) RemovePasskey(ctx context.Context, actor string, id int64) error {
-	p, err := a.CheckRemovePasskey(ctx, id)
-	if err != nil {
-		return err
-	}
 	return a.db.WithTx(ctx, func(tx *store.Tx) error {
+		p, err := tx.GetPasskey(ctx, id)
+		if errors.Is(err, store.ErrNotFound) {
+			return apierr.NotFound("passkey_not_found", "passkey not found")
+		}
+		if err != nil {
+			return err
+		}
+		n, err := tx.CountPasskeys(ctx)
+		if err != nil {
+			return err
+		}
+		if n <= 1 {
+			return apierr.Conflict("last_passkey", "you can't remove your only passkey; add another first")
+		}
 		if err := tx.DeletePasskey(ctx, id); err != nil {
 			return err
 		}

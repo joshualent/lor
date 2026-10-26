@@ -59,6 +59,7 @@ die() {
 
 BACKUP_DIR=
 CREATED_USERS=
+ADOPTED_USERS=
 COMMITTED=0
 CHANGED=0
 
@@ -90,6 +91,12 @@ rollback() {
 	for u in $CREATED_USERS; do
 		userdel -r "$u" >/dev/null 2>&1 || userdel "$u" >/dev/null 2>&1 || true
 	done
+	# Users adopted with --force get their previous password hash back.
+	for u in $ADOPTED_USERS; do
+		if [ -f "$BACKUP_DIR/passwd.$u" ]; then
+			usermod -p "$(cat "$BACKUP_DIR/passwd.$u")" "$u" 2>/dev/null || true
+		fi
+	done
 	if [ -d "$LOR_DIR/principals" ] && [ -z "$(ls -A "$LOR_DIR/principals" 2>/dev/null)" ]; then
 		rmdir "$LOR_DIR/principals" 2>/dev/null || true
 	fi
@@ -105,7 +112,7 @@ rollback() {
 
 on_exit() {
 	status=$?
-	if [ "$COMMITTED" -ne 1 ] && [ "$CHANGED" -eq 1 ]; then
+	if [ "$COMMITTED" -ne 1 ] && [ "$CHANGED" -eq 1 ] && [ "${ROLLED_BACK:-0}" -ne 1 ]; then
 		rollback
 		[ "$status" -ne 0 ] || status=1
 	fi
@@ -160,6 +167,8 @@ ensure_user() {
 		if ! is_managed "$u"; then
 			[ "$FORCE" -eq 1 ] || die "user $u already exists and wasn't created by Lor; re-run with --force to adopt it"
 			say "adopting existing user $u (--force)"
+			getent shadow "$u" | cut -d: -f2 >"$BACKUP_DIR/passwd.$u"
+			ADOPTED_USERS="$ADOPTED_USERS $u"
 		fi
 	else
 		useradd --create-home --shell /bin/bash --comment "Lor agent" "$u"
@@ -229,7 +238,7 @@ reload_sshd() {
 			# Socket-activated (Ubuntu >= 22.10): reload only if running; a
 			# stopped ssh.service reads the new config when it next starts.
 			if systemctl is-active --quiet "$unit"; then
-				systemctl reload "$unit"
+				systemctl reload "$unit" || return 1
 				say "reloaded $unit"
 			else
 				say "$unit is socket-activated and not running; new connections use the new config"
@@ -237,14 +246,14 @@ reload_sshd() {
 			return 0
 		fi
 		if systemctl is-active --quiet "$unit"; then
-			systemctl reload "$unit"
+			systemctl reload "$unit" || return 1
 			say "reloaded $unit"
 			return 0
 		fi
 	fi
 	pid=$(find_sshd_pid)
 	if [ -n "$pid" ]; then
-		kill -HUP "$pid"
+		kill -HUP "$pid" || return 1
 		say "sent SIGHUP to sshd (pid $pid)"
 	else
 		say "sshd is not running; it will use the new config when it starts"
@@ -311,6 +320,13 @@ debian:12 | debian:13 | ubuntu:22.04 | ubuntu:24.04 | ubuntu:26.04) ;;
 esac
 say "host $LOR_HOST: $OS_ID $OS_VERSION, OpenSSH $SSH_MAJOR.$SSH_MINOR"
 
+if [ "$WANT_SUDO" -eq 1 ] && [ "$UNINSTALL" -eq 0 ]; then
+	command -v sudo >/dev/null 2>&1 || die "sudo is not installed; install it (apt install sudo) or re-run with --no-sudo"
+	command -v visudo >/dev/null 2>&1 || die "visudo is not installed; install sudo (or sudo-rs) or re-run with --no-sudo"
+	[ -d /etc/sudoers.d ] || die "/etc/sudoers.d doesn't exist; check the sudo installation or re-run with --no-sudo"
+	say "sudo: $(sudo --version 2>/dev/null | head -n 1)"
+fi
+
 [ -f "$SSHD_CONFIG" ] || die "$SSHD_CONFIG not found"
 # sshd -t needs the privilege separation directory, which may be missing
 # while a socket-activated sshd isn't running.
@@ -327,13 +343,14 @@ if [ "$UNINSTALL" -eq 1 ]; then
 	remove_file "$DROPIN"
 	remove_file "$SUDOERS"
 	sshd_bin -t || die "sshd -t failed after removing Lor's drop-in"
+	reload_sshd || die "reloading sshd failed"
+	# sshd no longer trusts Lor's CA; nothing below can affect sshd.
 	COMMITTED=1
 	if [ "$KEEP_USERS" -eq 0 ]; then
 		remove_user agent-sudo
 		remove_user agent
 	fi
 	rm -rf "$LOR_DIR"
-	reload_sshd
 	say "Lor removed from $LOR_HOST"
 	exit 0
 fi
@@ -371,11 +388,7 @@ if [ "$WANT_SUDO" -eq 1 ]; then
 	printf '%s\n' "$LOR_HOST:sudo" | write_file "$LOR_DIR/principals/agent-sudo" 0644
 	printf '%s\n' "# Managed by Lor. Re-run bootstrap instead of editing." "agent-sudo ALL=(ALL:ALL) NOPASSWD: ALL" |
 		write_file "$SUDOERS.lor-check" 0440
-	if command -v visudo >/dev/null 2>&1; then
-		visudo -cf "$SUDOERS.lor-check" >/dev/null || die "visudo rejected the sudoers drop-in"
-	else
-		say "visudo not found; skipping the sudoers syntax check"
-	fi
+	visudo -cf "$SUDOERS.lor-check" >/dev/null || die "visudo rejected the sudoers drop-in"
 	backup "$SUDOERS"
 	mv -f "$SUDOERS.lor-check" "$SUDOERS"
 else
@@ -404,15 +417,31 @@ managed_list $users | write_file "$MANAGED" 0644
 
 # shellcheck disable=SC2086
 validate $users
-COMMITTED=1
 
 # --no-sudo on an existing host removes agent-sudo (after validation).
-if [ "$WANT_SUDO" -eq 0 ]; then
+if [ "$WANT_SUDO" -eq 0 ] && user_exists agent-sudo && is_managed agent-sudo; then
+	REMOVE_SUDO_USER=1
+else
+	REMOVE_SUDO_USER=0
+fi
+
+# Reload before committing: if it fails, the rollback restores the previous
+# files and reloads again.
+if ! reload_sshd; then
+	rollback
+	reload_sshd || true
+	ROLLED_BACK=1
+	die "reloading sshd failed; the previous configuration was restored"
+fi
+COMMITTED=1
+
+if [ "$REMOVE_SUDO_USER" -eq 1 ]; then
 	remove_user agent-sudo
+fi
+if [ "$WANT_SUDO" -eq 0 ]; then
 	managed_list agent | grep -vx agent-sudo >"$MANAGED.tmp" || true
 	mv -f "$MANAGED.tmp" "$MANAGED"
 fi
 
-reload_sshd
 say "Lor installed on $LOR_HOST (users: $users)"
 print_fingerprint

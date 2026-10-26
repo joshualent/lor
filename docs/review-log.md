@@ -25,3 +25,16 @@ No critical or high findings.
 | 1 | Med | Host `max_level` not rechecked when a sudo offer is claimed or a sudo grant extended after the host was lowered to `user`. | **Fixed.** Claim and every extend path (admin extend, approve extension, and their step-up `Check*`) refuse with `level_not_allowed`. Test added. |
 | 2 | Med | `ListAgentGrants` limited to 100 rows before filtering by status, so many denied requests could hide an active grant from the CLI. | **Fixed.** Open grants are settled first, then the status filter is applied in SQL before the limit. Test with 105 denied requests added. |
 | 3 | Med | Agents couldn't see a decided extension's outcome, so `lor extend --wait` couldn't tell denial from timeout. | **Fixed.** Agent `Grant` has `latest_extension` (any status); `lor extend --wait` follows its extension request and exits 0 / 2 (denied, with note) / 3 (timed out or moot). |
+
+## Round 3: auth (passkeys, sessions, step-up, agents) + bootstrap script (commits 301e82a, 907a6d9)
+
+No critical or high findings. The reviewer also ran the sshd drop-in and
+sudoers checks against a local Ubuntu 26.04 (OpenSSH + sudo-rs): they passed.
+
+| # | Sev | Finding | Decision |
+|---|-----|---------|----------|
+| 1 | Med | Two concurrent first scans could both see "no key"; the second silently replaced the first key without step-up. | **Fixed.** The first key is stored with a conditional `UPDATE … WHERE host_key IS NULL AND address = ?`; on conflict the scan is re-evaluated as a possible change (which needs step-up). |
+| 2 | Med | Concurrent passkey removals could delete every passkey. | **Fixed.** Existence and "not the last passkey" checks moved into the deleting transaction. |
+| 3 | Med | Bootstrap disabled rollback before the sshd reload; uninstall committed before reloading. | **Fixed (mostly).** Install commits only after a successful reload; a failed reload restores the previous files and reloads again. Uninstall removes the drop-in, validates and reloads before committing. **Declined:** backing up agent users' home directories before `--uninstall` deletes them: those homes are scratch space for the agent, and `--uninstall` is explicitly destructive per plan section 4 (`--keep-users` exists for keeping them). |
+| 4 | Med | Adopting an existing account with `--force` overwrote its password hash, and rollback didn't restore it. | **Fixed.** The previous shadow hash is saved and restored on rollback. |
+| 5 | Med | Missing sudo/visudo/`/etc/sudoers.d` failed late (after creating users) or skipped the mandatory `visudo -cf`. | **Fixed.** Preflight requires `sudo`, `visudo` and `/etc/sudoers.d` when `agent-sudo` is wanted (with guidance to use `--no-sudo`); `visudo -cf` is no longer optional. |

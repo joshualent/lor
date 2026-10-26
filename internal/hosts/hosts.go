@@ -347,11 +347,16 @@ func (s *Service) Rescan(ctx context.Context, actor, name string) (*ScanResult, 
 		return res, err
 	}
 	err = s.db.WithTx(ctx, func(tx *store.Tx) error {
-		if err := tx.SetHostKey(ctx, h.ID, key, s.now().Unix()); err != nil {
+		if err := tx.SetFirstHostKey(ctx, h.ID, h.Address, key, s.now().Unix()); err != nil {
 			return err
 		}
 		return audit(ctx, tx, s.now(), actor, "host.key_scanned", h.ID, map[string]any{"fingerprint": res.Fingerprint})
 	})
+	if errors.Is(err, store.ErrConflict) {
+		// Another scan stored a key (or the address changed) meanwhile:
+		// compare against that instead of overwriting it.
+		return s.Rescan(ctx, actor, name)
+	}
 	if err != nil {
 		return nil, err
 	}
