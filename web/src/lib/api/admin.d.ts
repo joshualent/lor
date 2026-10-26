@@ -731,7 +731,7 @@ export interface components {
             /** @description SSH software the host reported at its last scan, e.g. "OpenSSH_10.2p1 Ubuntu-2ubuntu3.8". */
             ssh_version?: string;
             /**
-             * @description Whether sshd enforces Lor's 15-minute idle timeout (OpenSSH 10.5+ applies ChannelTimeout in Match blocks).
+             * @description Whether sshd enforces Lor's 15-minute idle timeout. Needs OpenSSH 10.6+; older versions ignore ChannelTimeout in Match blocks or let session subtypes override it.
              * @enum {string}
              */
             idle_timeout: "enforced" | "unenforced" | "unknown";

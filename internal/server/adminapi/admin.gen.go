@@ -477,7 +477,7 @@ type Host struct {
 	Hypervisor         bool       `json:"hypervisor"`
 	Id                 int64      `json:"id"`
 
-	// IdleTimeout Whether sshd enforces Lor's 15-minute idle timeout (OpenSSH 10.5+ applies ChannelTimeout in Match blocks).
+	// IdleTimeout Whether sshd enforces Lor's 15-minute idle timeout. Needs OpenSSH 10.6+; older versions ignore ChannelTimeout in Match blocks or let session subtypes override it.
 	IdleTimeout HostIdleTimeout `json:"idle_timeout"`
 	LorInfra    bool            `json:"lor_infra"`
 	MaxLevel    Level           `json:"max_level"`
@@ -489,7 +489,7 @@ type Host struct {
 	Warnings   []Warning `json:"warnings"`
 }
 
-// HostIdleTimeout Whether sshd enforces Lor's 15-minute idle timeout (OpenSSH 10.5+ applies ChannelTimeout in Match blocks).
+// HostIdleTimeout Whether sshd enforces Lor's 15-minute idle timeout. Needs OpenSSH 10.6+; older versions ignore ChannelTimeout in Match blocks or let session subtypes override it.
 type HostIdleTimeout string
 
 // HostDetail defines model for HostDetail.
