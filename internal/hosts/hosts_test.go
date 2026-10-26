@@ -328,3 +328,27 @@ func TestVersionOnlyFromTrustedKey(t *testing.T) {
 		t.Fatalf("untrusted scan changed the version to %q", h.SSHVersion)
 	}
 }
+
+// Accepting a replacement key refreshes the version from the new server.
+func TestAcceptKeyRefreshesVersion(t *testing.T) {
+	e := newEnv(t)
+	e.keys["192.168.1.20"] = newKey()
+	scanVersion = "OpenSSH_10.6p1"
+	defer func() { scanVersion = "OpenSSH_10.2p1 Ubuntu-2ubuntu3.8" }()
+	e.svc.Create(e.ctx, "admin:x", Input{Name: "nas", Address: "192.168.1.20", MaxLevel: "sudo"})
+	h, _ := e.db.GetHostByName(e.ctx, "nas")
+	if IdleTimeout(h.SSHVersion) != "enforced" {
+		t.Fatalf("version %q", h.SSHVersion)
+	}
+	// Rebuilt with an older OpenSSH and a new key.
+	e.keys["192.168.1.20"] = newKey()
+	scanVersion = "OpenSSH_10.2p1"
+	res, _ := e.svc.Rescan(e.ctx, "admin:x", "nas")
+	if _, err := e.svc.AcceptKey(e.ctx, "admin:x", h.ID, res.Key); err != nil {
+		t.Fatal(err)
+	}
+	h, _ = e.db.GetHostByName(e.ctx, "nas")
+	if h.SSHVersion != "OpenSSH_10.2p1" || IdleTimeout(h.SSHVersion) != "unenforced" {
+		t.Fatalf("after accepting the new key: %q", h.SSHVersion)
+	}
+}

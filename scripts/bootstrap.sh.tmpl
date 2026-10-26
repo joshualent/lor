@@ -198,7 +198,7 @@ scan_file_ids() {
 		set -- "$p"
 		n=0
 		while IFS= read -r m; do
-			case "$m" in "$p"/*) ;; *) continue ;; esac
+			case "$m" in "$p" | "$p"/*) ;; *) continue ;; esac
 			if [ "$n" -eq 0 ]; then set -- "$@" "("; else set -- "$@" -o; fi
 			set -- "$@" -path "$m"
 			n=$((n + 1))
@@ -265,9 +265,6 @@ migrate_user() {
 	u=$1
 	old_uid=$(id -u "$u")
 	say "user $u has UID $old_uid, outside Lor's range $LOR_UID_MIN-$LOR_UID_MAX; recreating it"
-	for f in /etc/passwd /etc/shadow /etc/group /etc/gshadow; do
-		[ -e "$f" ] && backup "$f"
-	done
 	home=$(getent passwd "$u" | cut -d: -f6)
 	kill_user_processes "$old_uid"
 	others=$(count_uid_processes "$old_uid")
@@ -555,6 +552,11 @@ CHANGED=1
 mkdir -p "$DROPIN_DIR" "$LOR_DIR/principals"
 chmod 0755 "$LOR_DIR" "$LOR_DIR/principals"
 
+# Snapshot the account files before any account changes, so a rollback
+# (including of a recreated legacy user) restores exactly the old accounts.
+for f in /etc/passwd /etc/shadow /etc/group /etc/gshadow; do
+	[ -e "$f" ] && backup "$f"
+done
 ensure_user agent
 users="agent"
 if [ "$WANT_SUDO" -eq 1 ]; then

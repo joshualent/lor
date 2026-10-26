@@ -486,11 +486,18 @@ func (s *Service) AcceptKey(ctx context.Context, actor string, hostID int64, key
 		if err := tx.SetHostKey(ctx, h.ID, MarshalKey(k), s.now().Unix()); err != nil {
 			return err
 		}
+		// The recorded SSH version belonged to the old key's server (a
+		// rebuilt host may run another OpenSSH): forget it, then re-read it
+		// from a scan that presents the newly trusted key.
+		if err := tx.SetHostSSHVersion(ctx, h.ID, ""); err != nil {
+			return err
+		}
 		return audit(ctx, tx, s.now(), actor, "host.key_changed_accepted", h.ID, map[string]any{"previous": prev, "accepted": fp})
 	})
 	if err != nil {
 		return nil, err
 	}
+	_, _ = s.Rescan(ctx, actor, h.Name) // best effort; "unknown" until it succeeds
 	return s.db.GetHost(ctx, hostID)
 }
 

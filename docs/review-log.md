@@ -93,3 +93,11 @@ No critical findings.
 | 5 | Med | OpenSSH 10.5 still lets `session:shell`/`session:command` defaults override `session=15m` (fixed in 10.6; confirmed in the 10.6 release notes). | **Fixed.** Enforcement is claimed only from OpenSSH 10.6. |
 | 6 | Med | The scanned SSH version was stored even when the scanned key was untrusted (changed), so an impostor could change the idle-timeout claim. | **Fixed.** The version is only recorded with the first (TOFU) key or a matching trusted key. Test added. |
 | 7 | Low | The offer chat line was built from form state that stayed editable during the passkey prompt. | **Fixed.** Built from the returned grant; the form is locked while submitting. |
+
+## Round 7: verification of the round 6 fixes (b00b512, 3ef2e15)
+
+| # | Sev | Finding | Decision |
+|---|-----|---------|----------|
+| 1 | Med | Accepting a replacement host key kept the old server's SSH version, so the idle-timeout claim could be stale after a rebuild. | **Fixed.** Accepting a key clears the version and re-reads it with a scan that presents the newly trusted key. Test added. |
+| 2 | Med | With `agent` absent and a legacy `agent-sudo`, migration snapshotted the account files after `agent` was created, so rollback resurrected `agent`'s account without its home. | **Fixed.** Account files are snapshotted once before any account change. |
+| 3 | Low | A network filesystem mounted exactly at a scan root (e.g. NFS `/home`) wasn't pruned. | **Fixed.** Mounts equal to a scan root are pruned too. |
