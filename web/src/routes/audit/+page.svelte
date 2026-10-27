@@ -5,6 +5,7 @@
 	import { createQuery } from '@tanstack/svelte-query';
 	import { clock } from '#lib/clock.svelte.js';
 	import { ACTOR_FILTERS, CATEGORY_FILTERS, groupByDay } from '#lib/audit.js';
+	import { errorMessage } from '#lib/errors.js';
 	import { keys, fetchAudit, type AuditEvent } from '#lib/queries.js';
 	import { useNames } from '#lib/names.svelte.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -20,6 +21,7 @@
 	import Section from '#lib/components/lor/Section.svelte';
 	import SegmentedControl from '#lib/components/lor/SegmentedControl.svelte';
 	import Toolbar from '#lib/components/lor/Toolbar.svelte';
+	import StaleNotice from '#lib/components/lor/StaleNotice.svelte';
 
 	const PAGE = 100;
 
@@ -29,6 +31,7 @@
 	let older = $state<AuditEvent[]>([]);
 	let olderDone = $state(false);
 	let loadingMore = $state(false);
+	let moreError = $state<unknown>(null);
 
 	const filter = $derived({
 		actor: actor || undefined,
@@ -77,10 +80,13 @@
 		const last = events.at(-1);
 		if (!last) return;
 		loadingMore = true;
+		moreError = null;
 		try {
 			const next = await fetchAudit({ ...filter, before: last.id });
 			if (next.length < PAGE) olderDone = true;
 			older = [...older, ...next];
+		} catch (e) {
+			moreError = e;
 		} finally {
 			loadingMore = false;
 		}
@@ -124,9 +130,15 @@
 	</div>
 </Toolbar>
 
+{#if q.isError && q.data}<StaleNotice
+		error={q.error}
+		updatedAt={q.dataUpdatedAt}
+		onretry={() => q.refetch()}
+	/>{/if}
+
 {#if q.isPending}
 	<ListSkeleton rows={8} />
-{:else if q.isError}
+{:else if q.isError && !q.data}
 	<ErrorState error={q.error} onretry={() => q.refetch()} variant="inset" />
 {:else if events.length === 0}
 	<EmptyState
@@ -151,9 +163,14 @@
 				</List>
 			</Section>
 		{/each}
+		{#if moreError}
+			<p class="text-center text-footnote text-destructive" role="alert">
+				Couldn't load older events: {errorMessage(moreError)}
+			</p>
+		{/if}
 		{#if hasMore}
 			<Button variant="secondary" class="w-full" disabled={loadingMore} onclick={more}>
-				{#if loadingMore}<Spinner />{/if}Load older events
+				{#if loadingMore}<Spinner />{/if}{moreError ? 'Try again' : 'Load older events'}
 			</Button>
 		{:else}
 			<p class="text-center text-footnote text-muted-foreground">That's everything.</p>

@@ -32,6 +32,7 @@
 	import ListRow from '#lib/components/lor/ListRow.svelte';
 	import ListSkeleton from '#lib/components/lor/ListSkeleton.svelte';
 	import PageHeader from '#lib/components/lor/PageHeader.svelte';
+	import StaleNotice from '#lib/components/lor/StaleNotice.svelte';
 
 	const qc = useQueryClient();
 	const agents = createQuery(() => ({ queryKey: keys.agents, queryFn: fetchAgents }));
@@ -162,9 +163,14 @@
 		</Callout>
 	{/if}
 
+	{#if agents.isError && agents.data}<StaleNotice
+			error={agents.error}
+			updatedAt={agents.dataUpdatedAt}
+			onretry={() => agents.refetch()}
+		/>{/if}
 	{#if agents.isPending}
 		<ListSkeleton rows={3} />
-	{:else if agents.isError}
+	{:else if agents.isError && !agents.data}
 		<ErrorState error={agents.error} onretry={() => agents.refetch()} variant="inset" />
 	{:else if agents.data?.length === 0}
 		<EmptyState

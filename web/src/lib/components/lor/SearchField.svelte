@@ -33,7 +33,7 @@
 	{#if value}
 		<button
 			type="button"
-			class="absolute top-1/2 right-1.5 grid size-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground focus-ring hover:text-foreground"
+			class="absolute top-1/2 right-1.5 grid size-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground focus-ring after:absolute after:-inset-2 after:content-[''] hover:text-foreground"
 			aria-label="Clear {label}"
 			onclick={() => (value = '')}
 		>

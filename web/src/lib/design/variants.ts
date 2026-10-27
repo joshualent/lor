@@ -70,7 +70,7 @@ export const buttonVariants = tv({
 			sm: "h-8 gap-1.5 px-3 text-[13px] after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-['']",
 			lg: 'h-12 gap-2 px-5 text-base',
 			icon: 'size-10',
-			'icon-sm': "size-8 after:absolute after:-inset-1 after:content-['']"
+			'icon-sm': "size-8 after:absolute after:-inset-1.5 after:content-['']"
 		}
 	},
 	defaultVariants: { variant: 'default', size: 'default' }
@@ -226,7 +226,7 @@ export const listRowVariants = tv({
 export const segmentedVariants = tv({
 	slots: {
 		root: 'inline-flex max-w-full items-stretch gap-0.5 rounded-lg bg-card p-0.5',
-		item: 'focus-ring inline-flex min-h-9 min-w-0 sm:min-h-8 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-footnote font-medium whitespace-nowrap text-muted-foreground transition-colors duration-(--duration-fast) hover:text-foreground aria-checked:bg-secondary aria-checked:text-foreground [&_svg]:size-3.5'
+		item: "focus-ring relative inline-flex min-h-9 min-w-0 sm:min-h-8 after:absolute after:-inset-y-1 after:inset-x-0 after:content-[''] flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-footnote font-medium whitespace-nowrap text-muted-foreground transition-colors duration-(--duration-fast) hover:text-foreground aria-checked:bg-secondary aria-checked:text-foreground [&_svg]:size-3.5"
 	},
 	variants: {
 		fill: { true: { root: 'flex w-full' }, false: {} }
@@ -259,7 +259,7 @@ export const choiceCardVariants = tv({
 			true: { root: 'border-primary/70 bg-info-tint/60', indicator: 'border-primary bg-primary' },
 			false: {
 				root: 'border-border bg-card hover:bg-card-hover',
-				indicator: 'border-input',
+				indicator: 'border-icon-muted',
 				dot: 'scale-0'
 			}
 		}

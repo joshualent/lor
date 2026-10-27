@@ -15,6 +15,8 @@
 	import { hostLook } from '#lib/status.js';
 	import { useNames } from '#lib/names.svelte.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import { REVOKE_NOTE, WITHDRAW_NOTE } from '#lib/status.js';
 	import AuditEventRow from '#lib/components/lor/AuditEventRow.svelte';
 	import Confirm from '#lib/components/lor/Confirm.svelte';
 	import Countdown from '#lib/components/lor/Countdown.svelte';
@@ -28,6 +30,8 @@
 	import PageHeader from '#lib/components/lor/PageHeader.svelte';
 	import PageSkeleton from '#lib/components/lor/PageSkeleton.svelte';
 	import Section from '#lib/components/lor/Section.svelte';
+	import StatusBadge from '#lib/components/lor/StatusBadge.svelte';
+	import StaleNotice from '#lib/components/lor/StaleNotice.svelte';
 
 	const qc = useQueryClient();
 	const q = createQuery(() => ({
@@ -50,6 +54,7 @@
 
 	async function revoke() {
 		if (!revokeFor) return;
+		revoking = true;
 		try {
 			await call(
 				api.POST('/grants/{id}/revoke', { params: { path: { id: revokeFor.id } }, body: {} })
@@ -62,6 +67,8 @@
 			revokeOpen = false;
 		} catch (e) {
 			toast.error(errorMessage(e));
+		} finally {
+			revoking = false;
 		}
 		refresh();
 	}
@@ -69,18 +76,35 @@
 	const pendingCount = $derived(
 		(d?.pending_requests.length ?? 0) + (d?.pending_extensions.length ?? 0)
 	);
+	// Quick links to the sections ("4 waiting · 3 active · 1 offered").
 	const summary = $derived.by(() => {
-		if (!d) return undefined;
-		const parts = [];
-		if (pendingCount) parts.push(`${pendingCount} waiting for you`);
-		if (d.active.length) parts.push(`${d.active.length} active`);
-		if (d.offered.length) parts.push(`${d.offered.length} offered`);
-		return parts.length ? parts.join(' · ') : 'Nothing needs you right now.';
+		if (!d) return [];
+		return [
+			{ href: '#waiting', n: pendingCount, label: 'waiting for you' },
+			{ href: '#active', n: d.active.length, label: 'active' },
+			{ href: '#offers', n: d.offered.length, label: 'offered' }
+		].filter((x) => x.n > 0);
 	});
+	const hasCommands = $derived(!!d?.active.some((g) => g.last_command));
+	let revoking = $state(false);
 </script>
 
-<PageHeader title="Home" subtitle={summary}>
+<PageHeader
+	title="Home"
+	subtitle={d && summary.length === 0 ? 'Nothing needs you right now.' : undefined}
+>
 	{#snippet actions()}<Button href="/grants/new"><Plus /> Grant access</Button>{/snippet}
+	{#snippet meta()}
+		{#if summary.length}
+			<nav aria-label="Summary" class="-mt-2 flex flex-wrap gap-x-3 gap-y-1 text-callout">
+				{#each summary as x (x.href)}
+					<a href={x.href} class="text-muted-foreground hover:text-foreground"
+						><span class="font-medium text-foreground nums">{x.n}</span> {x.label}</a
+					>
+				{/each}
+			</nav>
+		{/if}
+	{/snippet}
 </PageHeader>
 
 {#snippet grantActions(g: Summary, cls: string)}
@@ -105,14 +129,25 @@
 	</div>
 {/snippet}
 
+{#if q.isError && q.data}<StaleNotice
+		error={q.error}
+		updatedAt={q.dataUpdatedAt}
+		onretry={() => q.refetch()}
+	/>{/if}
+
 {#if q.isPending}
 	<PageSkeleton header={false} sections={3} />
-{:else if q.isError}
+{:else if q.isError && !q.data}
 	<ErrorState error={q.error} onretry={() => q.refetch()} />
 {:else if d}
 	<div class="space-y-8">
 		{#if pendingCount > 0}
-			<Section title="Waiting for you" count={pendingCount}>
+			<Section
+				id="waiting"
+				title="Waiting for you"
+				count={pendingCount}
+				description="Reasons are written by the agents and unverified."
+			>
 				<List data-testid="pending">
 					{#each d.pending_requests as g (g.id)}
 						<ListRow href="/r/{g.id}" density="relaxed">
@@ -176,7 +211,10 @@
 				{#snippet subtitleContent()}
 					{g.agent.name}{g.status === 'offered' ? ' · not claimed yet' : ''}
 				{/snippet}
-				{#snippet metaContent()}<Countdown end={g.valid_before} variant="badge" />{/snippet}
+				{#snippet metaContent()}
+					{#if g.status === 'offered'}<StatusBadge status="offered" />{/if}
+					<Countdown end={g.valid_before} variant="badge" />
+				{/snippet}
 				{#snippet trailing()}
 					{@render grantActions(g, 'hidden gap-1 sm:flex')}
 				{/snippet}
@@ -198,7 +236,14 @@
 			</ListRow>
 		{/snippet}
 
-		<Section title="Active" count={d.active.length || undefined}>
+		<Section
+			id="active"
+			title="Active"
+			count={d.active.length || undefined}
+			description={hasCommands
+				? 'Last commands are reported by the agents and unverified.'
+				: undefined}
+		>
 			{#if d.active.length === 0}
 				<EmptyState
 					icon={ShieldCheck}
@@ -220,6 +265,7 @@
 
 		{#if d.offered.length}
 			<Section
+				id="offers"
 				title="Offers"
 				count={d.offered.length}
 				footnote="Pre-approved access. The agent claims it on its next lor ssh or lor request."
@@ -265,12 +311,14 @@
 		title={revokeFor?.status === 'offered'
 			? 'Withdraw this offer?'
 			: `Revoke access to ${revokeFor?.host.name}?`}
-		description="lor ssh stops working right away."
+		description={revokeFor?.status === 'offered' ? WITHDRAW_NOTE : REVOKE_NOTE}
 	>
 		{#snippet footer()}
 			<Button variant="outline" onclick={() => (revokeOpen = false)}>Cancel</Button>
-			<Button variant="destructive" onclick={revoke}
-				>{revokeFor?.status === 'offered' ? 'Withdraw' : 'Revoke'}</Button
+			<Button variant="destructive" disabled={revoking} onclick={revoke}
+				>{#if revoking}<Spinner />{/if}{revokeFor?.status === 'offered'
+					? 'Withdraw'
+					: 'Revoke'}</Button
 			>
 		{/snippet}
 	</Confirm>

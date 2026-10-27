@@ -6,6 +6,7 @@
 	import SectionHeader from './SectionHeader.svelte';
 
 	let {
+		id: anchor,
 		title,
 		count,
 		description,
@@ -16,6 +17,8 @@
 		class: className = '',
 		...rest
 	}: {
+		/** Anchor id, so the section can be linked to (#id). */
+		id?: string;
 		title?: string;
 		count?: number;
 		description?: string;
@@ -32,7 +35,13 @@
 	const id = `section-${Math.random().toString(36).slice(2, 9)}`;
 </script>
 
-<section class={className} aria-labelledby={title ? id : undefined} data-slot="section" {...rest}>
+<section
+	id={anchor}
+	class="scroll-mt-20 {className}"
+	aria-labelledby={title ? id : undefined}
+	data-slot="section"
+	{...rest}
+>
 	{#if title}
 		<SectionHeader {title} {id} {count} {description} {action} />
 	{/if}

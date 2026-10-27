@@ -184,7 +184,8 @@ The merge helpers (`cn()` and tailwind-variants) are configured
 | `UnverifiedText` | agent-written text: plain text, in full, labelled unverified |
 | `CopyField` | command/message with copy button (announces "Copied") |
 | `EmptyState` | icon, title (a heading), one sentence, next step; `inset`/`page`/`plain` |
-| `ErrorState` | failed load: server message as is, retry, way out; 404-aware |
+| `ErrorState` | failed first load: server message as is, retry, way out; 404-aware |
+| `StaleNotice` | a background refresh failed: keep showing the last data, say how old, retry |
 | `ListSkeleton`, `PageSkeleton`, `ui/skeleton` | loading placeholders (`aria-busy` + "Loading…") |
 | `ui/spinner` | in-button progress (e.g. while a passkey prompt is open) |
 | `Confirm` | dialog on wide screens, bottom drawer on phones (body scrolls, footer stays visible) |
@@ -206,11 +207,18 @@ The merge helpers (`cn()` and tailwind-variants) are configured
   and a `Confirm`. Danger rows in action lists use `tone="danger"`.
 - **States:** every query renders loading (skeleton), error (`ErrorState`
   with the server's message and a retry) and empty (`EmptyState` with the
-  next step) states. Ended things use final wording ("No commands were
+  next step) states. When a live page's background refresh fails, the last
+  data stays on screen under a `StaleNotice` (check `isError && !data` for
+  the error branch). Ended things use final wording ("No commands were
   reported"), never a promise ("appear here as …"). An empty state's action
   is secondary when the page header already has the primary one.
-- **Agent words** are quoted (“…”) in previews and labelled unverified in
-  full (`UnverifiedText`); the command log says it's reported by the CLI.
+- **Agent words** are quoted (“…”) in previews, with one "unverified" cue
+  per group (section description), and labelled unverified in full
+  (`UnverifiedText`); the command log says it's agent-reported and
+  unverified.
+- **Revoking** always explains the v1 limit (`REVOKE_NOTE` in `status.ts`):
+  lor ssh stops at once, but a saved certificate stays valid until it
+  expires; a revoked grant repeats this while its last certificate is valid.
 - **Detail pages put the live part first:** a grant shows time left and
   actions, warnings, a pending extension, then the command log, then the
   administrative details and history.

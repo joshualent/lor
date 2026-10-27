@@ -58,16 +58,21 @@
 			label="Add time"
 			placeholder="e.g. 90m or 2d"
 		/>
-		<div class="flex items-center gap-2 rounded-lg bg-card px-3 py-2.5 text-callout">
-			{#if newEnd}
-				<span class="text-muted-foreground">Ends {formatClock(Date.parse(end), clock.now)}</span>
-				<ArrowRight class="size-4 text-icon-muted" aria-hidden="true" />
-				<span class="font-medium text-primary">{formatClock(newEnd, clock.now)}</span>
-			{:else}
-				<span class="text-muted-foreground">Use minutes, hours, days or weeks, like 90m or 2d.</span
-				>
-			{/if}
-		</div>
+		{#if newEnd}
+			<div
+				class="grid grid-cols-[1fr_auto_1fr] items-center gap-x-3 rounded-lg bg-card px-3.5 py-3"
+			>
+				<div>
+					<p class="text-footnote text-muted-foreground">Current end</p>
+					<p class="font-medium nums">{formatClock(Date.parse(end), clock.now)}</p>
+				</div>
+				<ArrowRight class="size-4 text-icon-muted" aria-label="becomes" />
+				<div>
+					<p class="text-footnote text-muted-foreground">New end</p>
+					<p class="font-medium text-primary nums">{formatClock(newEnd, clock.now)}</p>
+				</div>
+			</div>
+		{/if}
 	</div>
 	{#snippet footer()}
 		<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>

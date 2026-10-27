@@ -63,3 +63,51 @@ targets); (4) navigation clipping and audit disclosure discoverability;
 | Add "Agent reason · unverified" labels to Home previews | **Partly accepted** | Previews are quoted (“…”) so they read as the agent's words; the full text with the explicit "unverified" label is one tap away on the consent page. A label on every row added noise without new information. |
 | Label commands "Agent-reported · unverified" | **Partly accepted** | The explanation ("Reported by the agent's CLI. It shows what lor ssh was asked to run, not what actually happened.") moved from a footnote to the section description, above the log. |
 | Out of scope (flagged by the reviewer) | **Declined** | Light theme, gradients, saturated surfaces, a new button/navbar/input style, heavier chrome, charts, notifications, bulk approvals, rich-text reasons, reworded warnings, fewer passkey taps. |
+
+## Round 2
+
+Screenshots: `lor-design-review/round-2/` (after the round-1 changes).
+
+| Category | Round 1 | Round 2 |
+|---|---:|---:|
+| Visual hierarchy | 7 | 8 |
+| Typography | 8 | 8 |
+| Color use and meaning | 7 | 9 |
+| Consistency / design-system coherence | 8 | 8 |
+| App-likeness and affordance | 7 | 8 |
+| Navigation and information architecture | 7 | 8 |
+| Information density and scannability | 7 | 8 |
+| Feedback and states | 7 | 7 |
+| Mobile experience | 6 | 8 |
+| Accessibility | 6 | 7 |
+| Overall polish | 7 | 8 |
+| **Overall** | **7** | **8** |
+
+The reviewer marked every round-1 finding resolved except the two
+trust-label items that were only partly accepted (still partly open) and
+touch targets (partly resolved).
+
+Top 5 from the reviewer: (1) finish the offer form's mobile layout;
+(2) the shared duration picker's keyboard behavior; (3) one trust cue per
+group; (4) connection and retry feedback; (5) consistent revocation
+wording.
+
+### Decisions
+
+| Finding | Decision | What changed / why |
+|---|---|---|
+| Offer form sections touch (`space-y` on the form, but its child is a `display: contents` fieldset) | **Accepted** | Spacing lives on the fieldset. The submit button wraps like the consent button. |
+| Arrow keys can focus "Custom" without selecting it; two tab stops when Custom is active | **Accepted** | `ChipGroup` routes appended chips through the same selection (they're clicked) and gives the tab stop only to the selected chip. Affects consent, extensions and offers. |
+| No "unverified" cue on Home previews and command previews | **Accepted (one cue per group)** | "Reasons are written by the agents and unverified." under Waiting for you; "Last commands are reported by the agents and unverified." under Active; the command log description starts with "Unverified:". Quotes stay. |
+| Blank screen while the session loads; no retry on connection failure | **Accepted** | "Checking your session…" with a spinner; "Can't reach Lor" has a Try again button (and no longer claims to retry by itself). |
+| A failed background refresh replaced cached data with an error | **Accepted** (a real bug) | Live pages keep the last data and show a `StaleNotice` ("Couldn't refresh. Showing data from 21:03." + Retry); the error page is only for a failed first load. Covered by a new E2E test. |
+| Audit "Load older" has no failure handling | **Accepted** | Inline error with Try again. |
+| Revoke wording differs between Home and the grant page; no busy state on Home | **Accepted** | One `REVOKE_NOTE` (lor ssh stops at once; a saved certificate stays valid until it expires) and a separate note for withdrawing offers; Home's confirm button shows a spinner and is disabled while submitting. A revoked or released grant explains this next to its status while its last certificate is still valid. |
+| Unchecked radio in `ChoiceCard` ≈1.5:1 | **Accepted** | Uses `icon-muted` (3.9:1). |
+| `icon-sm` 40 px, segments 36 px, search clear 28 px hit areas | **Accepted** | 44 px invisible hit areas for all three, same visuals. |
+| Extend dialog dates wrap unevenly | **Accepted** | Labelled "Current end" → "New end" columns. |
+| Offer row lacks an explicit "Offered" status | **Accepted** | Blue Offered badge on Home's offer rows. |
+| Home summary counts should link to their sections | **Accepted** | "4 waiting for you · 3 active · 1 offered" are links to the sections. |
+| Expanded audit details should show the full timestamp | **Accepted** | Seconds and time zone shown next to the action in the expanded details. |
+| Input and checkbox focus keep their halo treatment | **Kept** | Their accent border changes to the solid accent color on focus (≥ 3:1) in addition to the halo; the owner likes the current inputs, so their look stays. |
+| Out of scope (flagged by the reviewer) | **Declined** | Light theme, gradients, saturated surfaces, heavier chrome, new control styling, charts, notifications, bulk approvals, rich-text reasons, weaker trust labels, reworded warnings, removing the sudo acknowledgement, fewer passkey taps. |

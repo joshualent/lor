@@ -29,6 +29,7 @@
 	import PageSkeleton from '#lib/components/lor/PageSkeleton.svelte';
 	import Section from '#lib/components/lor/Section.svelte';
 	import StatusBadge from '#lib/components/lor/StatusBadge.svelte';
+	import StaleNotice from '#lib/components/lor/StaleNotice.svelte';
 	import UnverifiedText from '#lib/components/lor/UnverifiedText.svelte';
 	import Warnings from '#lib/components/lor/Warnings.svelte';
 
@@ -105,10 +106,15 @@
 
 {#if q.isPending}
 	<PageSkeleton />
-{:else if q.isError}
+{:else if q.isError && !q.data}
 	<ErrorState error={q.error} onretry={() => q.refetch()} back={{ href: '/', label: 'Home' }} />
 {:else if d}
 	{@const g = d.grant}
+	{#if q.isError && q.data}<StaleNotice
+			error={q.error}
+			updatedAt={q.dataUpdatedAt}
+			onretry={() => q.refetch()}
+		/>{/if}
 	<article class="space-y-7" data-testid="extension">
 		<PageHeader
 			title="{g.agent.name} wants more time on {g.host.name}"

@@ -65,7 +65,10 @@
 	{#if expandable && open}
 		<div id={regionId} class="px-4 pb-3 pl-14">
 			<div class="space-y-1.5 rounded-lg bg-muted px-3 py-2.5">
-				<p class="font-mono text-caption text-muted-foreground">{ev.action}</p>
+				<p class="flex flex-wrap justify-between gap-x-3 text-caption text-muted-foreground">
+					<span class="font-mono">{ev.action}</span>
+					<time datetime={ev.ts} class="nums">{formatTimestamp(ms)}</time>
+				</p>
 				{#if details.length}
 					<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-footnote">
 						{#each details as [k, v] (k)}

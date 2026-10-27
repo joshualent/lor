@@ -13,7 +13,7 @@
 	import { errorMessage, isCancel } from '#lib/errors.js';
 	import { formatAgo, formatClock, formatCountdown, formatDuration } from '#lib/format.js';
 	import { keys, fetchGrant, LIVE_MS } from '#lib/queries.js';
-	import { hostLook, passkeyName } from '#lib/status.js';
+	import { hostLook, passkeyName, REVOKE_NOTE, WITHDRAW_NOTE } from '#lib/status.js';
 	import { stepUp } from '#lib/webauthn.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -40,6 +40,7 @@
 	import PageHeader from './PageHeader.svelte';
 	import PageSkeleton from './PageSkeleton.svelte';
 	import Section from './Section.svelte';
+	import StaleNotice from './StaleNotice.svelte';
 	import StatusBadge from './StatusBadge.svelte';
 	import TimeBar from './TimeBar.svelte';
 	import Timeline from './Timeline.svelte';
@@ -158,13 +159,22 @@
 	);
 	const live = $derived(g?.status === 'active' || g?.status === 'offered');
 	const host = $derived(g ? hostLook(g.host) : null);
+	// End of the newest certificate (it stays valid after a revoke; no KRL yet).
+	const certEnd = $derived(
+		g?.certificates.length ? Math.max(...g.certificates.map((c) => Date.parse(c.valid_before))) : 0
+	);
 </script>
 
 {#if q.isPending}
 	<PageSkeleton />
-{:else if q.isError}
+{:else if q.isError && !q.data}
 	<ErrorState error={q.error} onretry={() => q.refetch()} back={{ href: '/', label: 'Home' }} />
 {:else if g && host}
+	{#if q.isError && q.data}<StaleNotice
+			error={q.error}
+			updatedAt={q.dataUpdatedAt}
+			onretry={() => q.refetch()}
+		/>{/if}
 	<!-- ============================================================ consent view -->
 	{#if g.consent && g.actions.authorize}
 		<article class="space-y-7" data-testid="consent">
@@ -315,6 +325,18 @@
 				{/snippet}
 			</PageHeader>
 
+			{#if (g.status === 'revoked' || g.status === 'released') && certEnd && certEnd > clock.now}
+				<Callout
+					tone="neutral"
+					title={g.status === 'revoked' ? 'Revoked' : 'Released by the agent'}
+				>
+					lor ssh no longer works for this grant. The last certificate stays valid until {formatClock(
+						certEnd,
+						clock.now
+					)}, so a raw ssh session with a saved copy could still log in until then.
+				</Callout>
+			{/if}
+
 			{#if live && g.valid_before}
 				<Card padding="lg">
 					<div class="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
@@ -370,7 +392,7 @@
 				<Section
 					title="Command log"
 					count={g.commands.length || undefined}
-					description="Reported by the agent's CLI. It shows what lor ssh was asked to run, not what actually happened."
+					description="Unverified: reported by the agent's CLI. It shows what lor ssh was asked to run, not what actually happened."
 				>
 					<CommandLog commands={g.commands} ended={!live} />
 				</Section>
@@ -478,7 +500,7 @@
 	<Confirm
 		bind:open={revokeOpen}
 		title={g.status === 'offered' ? 'Withdraw this offer?' : `Revoke access to ${g.host.name}?`}
-		description="lor ssh stops working right away. A raw ssh session with the saved certificate could still work until it expires."
+		description={g.status === 'offered' ? WITHDRAW_NOTE : REVOKE_NOTE}
 	>
 		<div class="space-y-2">
 			<Label for="revoke-note">Note (optional)</Label>

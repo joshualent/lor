@@ -15,6 +15,7 @@
 		scroll = false,
 		onchange,
 		after,
+		extraSelected = false,
 		class: className
 	}: {
 		options: { value: T; label: string; selected?: boolean }[];
@@ -23,8 +24,14 @@
 		labelledby?: string;
 		scroll?: boolean;
 		onchange?: (value: T) => void;
-		/** Extra chips after the options (e.g. "Custom"); they manage their own state. */
+		/**
+		 * Extra radio chips after the options (e.g. "Custom"), with
+		 * data-index continuing after the options; they manage their own state
+		 * (arrow keys "click" them).
+		 */
 		after?: Snippet<[{ chipClass: (selected: boolean) => string }]>;
+		/** An extra chip is the selected one (so no option takes the tab stop). */
+		extraSelected?: boolean;
 		class?: string;
 	} = $props();
 
@@ -34,7 +41,10 @@
 	const anySelected = $derived(options.some(isSelected));
 
 	function select(i: number) {
-		if (i >= options.length) return;
+		if (i >= options.length) {
+			el?.querySelector<HTMLElement>(`[data-index="${i}"]`)?.click();
+			return;
+		}
 		value = options[i].value;
 		onchange?.(value);
 	}
@@ -72,7 +82,7 @@
 			type="button"
 			role="radio"
 			aria-checked={isSelected(o)}
-			tabindex={isSelected(o) || (!anySelected && i === 0) ? 0 : -1}
+			tabindex={isSelected(o) || (!anySelected && !extraSelected && i === 0) ? 0 : -1}
 			data-index={i}
 			class={chipClass(isSelected(o))}
 			onclick={() => select(i)}>{o.label}</button

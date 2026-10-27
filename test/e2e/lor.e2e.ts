@@ -208,3 +208,15 @@ test('audit log filters by category and shows event details', async () => {
 	await page.keyboard.press('ArrowRight');
 	await expect(page.getByRole('radio', { name: 'You' })).toBeChecked();
 });
+
+test('a failed background refresh keeps the last data on screen', async () => {
+	await page.goto('/');
+	await expect(page.getByRole('heading', { name: 'Recent activity' })).toBeVisible();
+	await page.route('**/api/admin/v1/dashboard', (r) => r.abort());
+	// The dashboard polls every 5 s and retries network errors before failing.
+	await expect(page.getByText("Couldn't refresh.")).toBeVisible({ timeout: 30_000 });
+	await expect(page.getByRole('heading', { name: 'Recent activity' })).toBeVisible();
+	await page.unroute('**/api/admin/v1/dashboard');
+	await page.getByRole('button', { name: 'Retry' }).click();
+	await expect(page.getByText("Couldn't refresh.")).toHaveCount(0);
+});

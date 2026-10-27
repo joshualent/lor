@@ -34,6 +34,7 @@
 	import PageHeader from '#lib/components/lor/PageHeader.svelte';
 	import PageSkeleton from '#lib/components/lor/PageSkeleton.svelte';
 	import Section from '#lib/components/lor/Section.svelte';
+	import StaleNotice from '#lib/components/lor/StaleNotice.svelte';
 	import SegmentedControl from '#lib/components/lor/SegmentedControl.svelte';
 	import SettingsRow from '#lib/components/lor/SettingsRow.svelte';
 	import Warnings from '#lib/components/lor/Warnings.svelte';
@@ -138,13 +139,18 @@
 
 {#if q.isPending}
 	<PageSkeleton />
-{:else if q.isError}
+{:else if q.isError && !q.data}
 	<ErrorState
 		error={q.error}
 		onretry={() => q.refetch()}
 		back={{ href: '/hosts', label: 'All hosts' }}
 	/>
 {:else if h && q.data && look}
+	{#if q.isError && q.data}<StaleNotice
+			error={q.error}
+			updatedAt={q.dataUpdatedAt}
+			onretry={() => q.refetch()}
+		/>{/if}
 	<PageHeader title={h.name} back={{ href: '/hosts', label: 'Hosts' }}>
 		{#snippet leading()}<IconTile icon={look.icon} tone={look.tone} size="lg" />{/snippet}
 		{#snippet heading()}

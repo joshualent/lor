@@ -118,3 +118,12 @@ export function agentLook(a: AgentFlags): { icon: Component; tone: Tone; badge: 
 export function passkeyName(actor: string | undefined): string {
 	return (actor ?? '').replace(/^admin:/, '');
 }
+
+/**
+ * What revoking means (v1 has no KRL: Lor stops honoring the grant, but a
+ * certificate already saved on the agent's machine stays valid until it
+ * expires). Withdrawing an offer just ends it.
+ */
+export const REVOKE_NOTE =
+	'lor ssh stops working right away. A raw ssh session with the saved certificate could still work until it expires.';
+export const WITHDRAW_NOTE = "The offer ends right away; the agent can't claim it anymore.";

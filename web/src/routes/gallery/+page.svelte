@@ -55,6 +55,7 @@
 	import Section from '#lib/components/lor/Section.svelte';
 	import SegmentedControl from '#lib/components/lor/SegmentedControl.svelte';
 	import SettingsRow from '#lib/components/lor/SettingsRow.svelte';
+	import StaleNotice from '#lib/components/lor/StaleNotice.svelte';
 	import StatusBadge from '#lib/components/lor/StatusBadge.svelte';
 	import StatusDot from '#lib/components/lor/StatusDot.svelte';
 	import TimeBar from '#lib/components/lor/TimeBar.svelte';
@@ -524,6 +525,11 @@
 				variant="inset"
 				error={new ApiError(404, 'not_found', 'grant not found')}
 				back={{ href: '#', label: 'Home' }}
+			/>
+			<StaleNotice
+				error={new ApiError(0, 'network', "Can't reach Lor. Check your connection and try again.")}
+				updatedAt={now - 2 * MIN}
+				onretry={() => {}}
 			/>
 			<ListSkeleton rows={2} />
 			<div class="flex items-center gap-3">

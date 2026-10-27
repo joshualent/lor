@@ -148,9 +148,9 @@
 		{/snippet}
 	</EmptyState>
 {:else}
-	<form class="space-y-7" onsubmit={submit}>
+	<form onsubmit={submit}>
 		<!-- Locked while the passkey prompt is open: the action is already fixed. -->
-		<fieldset disabled={busy} class="contents">
+		<fieldset disabled={busy} class="min-w-0 space-y-7">
 			<Section title="Who and where">
 				<Card class="space-y-5">
 					<Field label="Agent" for="agent">
@@ -243,7 +243,7 @@
 					<Button
 						type="submit"
 						size="lg"
-						class="w-full"
+						class="h-auto min-h-12 w-full py-2 leading-snug whitespace-normal"
 						disabled={!ready}
 						data-testid="create-offer"
 					>

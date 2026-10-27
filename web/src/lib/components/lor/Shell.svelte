@@ -8,6 +8,9 @@
 	import { api, call } from '#lib/api/client.js';
 	import EmptyState from './EmptyState.svelte';
 	import CloudOff from '@lucide/svelte/icons/cloud-off';
+	import RotateCw from '@lucide/svelte/icons/rotate-cw';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 
 	let { children }: { children: Snippet } = $props();
 	const qc = useQueryClient();
@@ -121,9 +124,24 @@
 				tone="danger"
 				variant="page"
 				title="Can't reach Lor"
-				description="Retrying automatically. Check that the server is running and your connection is up."
+				description="Check that the server is running and your connection is up."
 				role="alert"
-			/>
+			>
+				{#snippet action()}
+					<Button
+						variant="secondary"
+						disabled={session.isFetching}
+						onclick={() => session.refetch()}
+						>{#if session.isFetching}<Spinner />{:else}<RotateCw />{/if} Try again</Button
+					>
+				{/snippet}
+			</EmptyState>
+		{:else}
+			<div class="flex min-h-[50dvh] items-center justify-center" role="status">
+				<p class="flex items-center gap-2 text-callout text-muted-foreground">
+					<Spinner class="size-4" /> Checking your session…
+				</p>
+			</div>
 		{/if}
 	</main>
 </div>

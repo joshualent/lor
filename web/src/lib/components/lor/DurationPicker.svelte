@@ -66,6 +66,7 @@
 		{options}
 		{value}
 		{label}
+		extraSelected={custom}
 		onchange={(s) => {
 			custom = false;
 			value = s;

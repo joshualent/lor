@@ -135,7 +135,7 @@
 		{/snippet}
 		{#if passkeys.isPending}
 			<ListSkeleton rows={2} />
-		{:else if passkeys.isError}
+		{:else if passkeys.isError && !passkeys.data}
 			<ErrorState error={passkeys.error} onretry={() => passkeys.refetch()} variant="inset" />
 		{:else}
 			<List>
@@ -186,7 +186,7 @@
 	<Section title="Sessions" count={sessions.data?.length}>
 		{#if sessions.isPending}
 			<ListSkeleton rows={2} />
-		{:else if sessions.isError}
+		{:else if sessions.isError && !sessions.data}
 			<ErrorState error={sessions.error} onretry={() => sessions.refetch()} variant="inset" />
 		{:else}
 			<List>
