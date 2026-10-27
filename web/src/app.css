@@ -1,53 +1,113 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn-svelte/tailwind.css';
+/* Self-hosted (bundled by Vite, served from 'self'): no font CDN. */
+@import '@fontsource-variable/inter/wght.css';
 
 /*
- * Lor theme: dark only, calm charcoal greys (not black), one restrained
- * accent. Text pairs pass WCAG AA on every surface (checked in
- * src/lib/theme.spec.ts).
+ * Lor design tokens. Dark only: calm charcoal greys (not black), one
+ * restrained accent, and a small set of semantic tones where color carries
+ * meaning (status, risk, audit outcome). Every text pair passes WCAG AA,
+ * checked in src/lib/theme.spec.ts. Usage rules: docs/design-system.md.
  */
 :root {
 	color-scheme: dark;
 
-	--background: #232326;
+	/* ---- Surfaces (elevation by lightness, not shadow) ------------------ */
+	--background: #232326; /* the page */
 	--foreground: #ececee;
-	--card: #2b2b2f;
+	--card: #2b2b2f; /* grouped lists, cards */
 	--card-foreground: #ececee;
-	--popover: #2f2f34;
+	--card-hover: #323236; /* pressed / hovered row inside a card */
+	--popover: #2f2f34; /* dialogs, drawers, toasts */
 	--popover-foreground: #ececee;
 
-	/* The accent: used for the main action on a page and focus rings only. */
+	/* The accent: the main action on a page, selection and focus rings. */
 	--primary: #9db9ee;
 	--primary-foreground: #16171b;
 
-	--secondary: #36363c;
+	--secondary: #36363c; /* quiet buttons, selected nav item, segments */
 	--secondary-foreground: #ececee;
-	--muted: #2f2f34;
-	--muted-foreground: #a9a9b2;
+	--muted: #2f2f34; /* code wells, skeletons */
+	--muted-foreground: #a9a9b2; /* secondary text */
 	--accent: #36363c;
 	--accent-foreground: #ececee;
 
-	--destructive: #f0897f;
-	--warning: #e6b866;
-	--success: #8fcca2;
-
-	--border: #3a3a40;
+	--border: #3a3a40; /* card edges, dividers between sections */
+	--separator: #36363b; /* hairlines between rows inside a card */
 	--input: #45454c;
 	--ring: #9db9ee;
+	--icon-muted: #85858e; /* chevrons and decorative icons (non-text, ≥ 3:1) */
 
+	/* ---- Semantic tones: fg (text/icon), tint (background), edge ------- */
+	/* success: active, approved, healthy */
+	--success: #8fcca2;
+	--success-tint: #38403e;
+	--success-edge: #495b52;
+	/* warning: needs your decision, expiring soon, sudo (root) */
+	--warning: #e6b866;
+	--warning-tint: #433d36;
+	--warning-edge: #635540;
+	/* danger: risk to Lor itself, denied, revoked, destructive actions */
+	--destructive: #f0897f;
+	--destructive-tint: #453739;
+	--destructive-edge: #664747;
+	/* info: offers and informational notes (same hue as the accent) */
+	--info: #9db9ee;
+	--info-tint: #3a3d48;
+	--info-edge: #4d5668;
+	/* neutral: ended normally (expired, released, timed out) */
+	--neutral: #a9a9b2;
+	--neutral-tint: #3b3b40;
+	--neutral-edge: #515156;
+	/* categorical (audit categories only, never status) */
+	--violet: #c0a8f0;
+	--violet-tint: #3e3b48;
+	--violet-edge: #585069;
+	--teal: #7ccfc2;
+	--teal-tint: #364042;
+	--teal-edge: #435c5b;
+
+	/* ---- Shape, elevation, motion -------------------------------------- */
 	--radius: 0.625rem;
+	--shadow-overlay: 0 16px 40px -12px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(255 255 255 / 0.06);
+	--ease-standard: cubic-bezier(0.2, 0, 0, 1);
+	--duration-fast: 120ms;
+	--duration-medium: 200ms;
 }
 
 @theme inline {
 	--font-sans:
-		ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+		'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 	--font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+
+	/* Type scale (body is 15px). Use these names, not raw text-[..] sizes. */
+	--text-title: 1.625rem;
+	--text-title--line-height: 1.2;
+	--text-title--letter-spacing: -0.02em;
+	--text-title--font-weight: 650;
+	--text-headline: 1.125rem;
+	--text-headline--line-height: 1.35;
+	--text-headline--letter-spacing: -0.01em;
+	--text-headline--font-weight: 600;
+	--text-heading: 0.9375rem;
+	--text-heading--line-height: 1.4;
+	--text-heading--font-weight: 600;
+	--text-body: 0.9375rem;
+	--text-body--line-height: 1.5;
+	--text-callout: 0.875rem;
+	--text-callout--line-height: 1.45;
+	--text-footnote: 0.8125rem;
+	--text-footnote--line-height: 1.4;
+	--text-caption: 0.75rem;
+	--text-caption--line-height: 1.3;
+	--text-caption--letter-spacing: 0.01em;
 
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-card: var(--card);
 	--color-card-foreground: var(--card-foreground);
+	--color-card-hover: var(--card-hover);
 	--color-popover: var(--popover);
 	--color-popover-foreground: var(--popover-foreground);
 	--color-primary: var(--primary);
@@ -58,17 +118,41 @@
 	--color-muted-foreground: var(--muted-foreground);
 	--color-accent: var(--accent);
 	--color-accent-foreground: var(--accent-foreground);
-	--color-destructive: var(--destructive);
-	--color-warning: var(--warning);
-	--color-success: var(--success);
 	--color-border: var(--border);
+	--color-separator: var(--separator);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
+	--color-icon-muted: var(--icon-muted);
+
+	--color-success: var(--success);
+	--color-success-tint: var(--success-tint);
+	--color-success-edge: var(--success-edge);
+	--color-warning: var(--warning);
+	--color-warning-tint: var(--warning-tint);
+	--color-warning-edge: var(--warning-edge);
+	--color-destructive: var(--destructive);
+	--color-destructive-tint: var(--destructive-tint);
+	--color-destructive-edge: var(--destructive-edge);
+	--color-info: var(--info);
+	--color-info-tint: var(--info-tint);
+	--color-info-edge: var(--info-edge);
+	--color-neutral: var(--neutral);
+	--color-neutral-tint: var(--neutral-tint);
+	--color-neutral-edge: var(--neutral-edge);
+	--color-violet: var(--violet);
+	--color-violet-tint: var(--violet-tint);
+	--color-violet-edge: var(--violet-edge);
+	--color-teal: var(--teal);
+	--color-teal-tint: var(--teal-tint);
+	--color-teal-edge: var(--teal-edge);
 
 	--radius-sm: calc(var(--radius) * 0.6);
 	--radius-md: calc(var(--radius) * 0.8);
 	--radius-lg: var(--radius);
 	--radius-xl: calc(var(--radius) * 1.4);
+
+	--shadow-overlay: var(--shadow-overlay);
+	--ease-standard: var(--ease-standard);
 }
 
 @layer base {
@@ -78,14 +162,16 @@
 	html {
 		@apply bg-background font-sans antialiased;
 		-webkit-text-size-adjust: 100%;
+		-webkit-tap-highlight-color: transparent;
+		font-feature-settings: 'cv11', 'ss01';
 	}
 	body {
-		@apply min-h-dvh bg-background text-[15px] leading-relaxed text-foreground;
+		@apply min-h-dvh bg-background text-body text-foreground;
 	}
 	h1,
 	h2,
 	h3 {
-		@apply font-semibold tracking-tight text-balance;
+		@apply text-balance;
 	}
 	a:not([data-slot]) {
 		@apply underline-offset-4 hover:underline;
@@ -95,9 +181,37 @@
 	pre {
 		@apply font-mono text-[0.92em];
 	}
+	::selection {
+		background: color-mix(in srgb, var(--primary) 35%, transparent);
+	}
 }
 
-/* Plain-text block for anything written by an agent. */
+/* Respect the OS setting: no movement, instant state changes. */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	::before,
+	::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}
+
+/* Plain-text block for anything written by an agent (never HTML). */
 @utility unverified-text {
-	@apply border-l-2 border-muted-foreground/40 pl-3 break-words whitespace-pre-wrap text-foreground;
+	@apply break-words whitespace-pre-wrap text-foreground;
+}
+
+/* Consistent keyboard focus for custom interactive elements. */
+@utility focus-ring {
+	@apply outline-none focus-visible:ring-3 focus-visible:ring-ring/50;
+}
+@utility focus-ring-inset {
+	@apply outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset;
+}
+
+/* Tabular figures for times, countdowns and counts. */
+@utility nums {
+	font-variant-numeric: tabular-nums;
 }
