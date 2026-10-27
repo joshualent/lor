@@ -91,6 +91,22 @@ exact action, CSRF rules, agent text never rendered as HTML).
 - **Dark theme only**, as requested; shadcn variants were trimmed to what the
   UI uses.
 - Confirmations use a dialog on wide screens and a bottom drawer on phones.
+- **Design system** (docs/design-system.md): the UI is composed from a typed
+  component library with semantic status colors; a dev-only component
+  gallery lives at `/gallery` (production builds compile an empty page in its
+  place and the route returns 404). The Inter font is self-hosted
+  (`@fontsource-variable/inter`, bundled, `font-src 'self'`).
+- **Consent page order:** warnings, then the agent's reason, then the request
+  details and choices (level, duration, limits). The plan lists the reason
+  last; reading why before choosing how much is easier on a phone. The
+  content and rules (reason in full as plain text, warnings from the server,
+  sudo checkbox gating Authorize) are unchanged.
+- **Agents** have no detail route: tapping an agent opens a sheet with its
+  details and actions (edit LAN IPs, rotate token, disable/enable).
+- **Settings** also shows the server's UI config (public URL, default and
+  maximum durations, approval timeout) read-only, from `/session`.
+- `make screens` (not in CI) seeds realistic data and screenshots every page
+  at desktop and phone widths (`test/screens/`).
 
 ## Development mode
 

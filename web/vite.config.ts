@@ -2,12 +2,30 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
+import type { Plugin } from 'vite';
+
+// The component gallery (/gallery) is for development only: production
+// builds compile an empty page in its place (and its load() returns 404), so
+// none of it ships.
+function devOnlyGallery(): Plugin {
+	return {
+		name: 'lor:dev-only-gallery',
+		enforce: 'pre',
+		apply: 'build',
+		load(id) {
+			if (id.split('?')[0].replace(/\\/g, '/').endsWith('/src/routes/gallery/+page.svelte')) {
+				return '<!-- The component gallery is only built in development. -->';
+			}
+		}
+	};
+}
 
 // Where `lor-server --dev` listens (make dev).
 const devServer = process.env.LOR_DEV_SERVER ?? 'http://127.0.0.1:8444';
 
 export default defineConfig({
 	plugins: [
+		devOnlyGallery(),
 		tailwindcss(),
 		sveltekit({
 			compilerOptions: {
