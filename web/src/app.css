@@ -205,7 +205,7 @@
 
 /* Consistent keyboard focus for custom interactive elements. */
 @utility focus-ring {
-	@apply outline-none focus-visible:ring-3 focus-visible:ring-ring/50;
+	@apply outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
 }
 @utility focus-ring-inset {
 	@apply outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset;

@@ -52,7 +52,7 @@ const toneDot: Record<Tone, string> = {
 // ---------------------------------------------------------------- buttons
 
 export const buttonVariants = tv({
-	base: "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/40 aria-invalid:border-destructive/50 rounded-md border border-transparent bg-clip-padding text-sm font-medium focus-visible:ring-3 aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-[color,background-color,border-color,opacity] duration-(--duration-fast) outline-none select-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+	base: "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-invalid:ring-destructive/40 aria-invalid:border-destructive/50 relative rounded-md border border-transparent bg-clip-padding text-sm font-medium aria-invalid:ring-3 active:not-aria-[haspopup]:translate-y-px [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-[color,background-color,border-color,opacity] duration-(--duration-fast) outline-none select-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
 	variants: {
 		// One accent (default) used for the page's main action; quiet
 		// alternatives; no shadows. Sizes are touch-friendly.
@@ -67,10 +67,10 @@ export const buttonVariants = tv({
 		},
 		size: {
 			default: 'h-10 gap-2 px-4',
-			sm: 'h-8 gap-1.5 px-3 text-[13px]',
+			sm: "h-8 gap-1.5 px-3 text-[13px] after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-['']",
 			lg: 'h-12 gap-2 px-5 text-base',
 			icon: 'size-10',
-			'icon-sm': 'size-8'
+			'icon-sm': "size-8 after:absolute after:-inset-1 after:content-['']"
 		}
 	},
 	defaultVariants: { variant: 'default', size: 'default' }
@@ -226,7 +226,7 @@ export const listRowVariants = tv({
 export const segmentedVariants = tv({
 	slots: {
 		root: 'inline-flex max-w-full items-stretch gap-0.5 rounded-lg bg-card p-0.5',
-		item: 'focus-ring inline-flex min-h-8 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-footnote font-medium whitespace-nowrap text-muted-foreground transition-colors duration-(--duration-fast) hover:text-foreground aria-checked:bg-secondary aria-checked:text-foreground [&_svg]:size-3.5'
+		item: 'focus-ring inline-flex min-h-9 min-w-0 sm:min-h-8 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-footnote font-medium whitespace-nowrap text-muted-foreground transition-colors duration-(--duration-fast) hover:text-foreground aria-checked:bg-secondary aria-checked:text-foreground [&_svg]:size-3.5'
 	},
 	variants: {
 		fill: { true: { root: 'flex w-full' }, false: {} }
@@ -235,7 +235,7 @@ export const segmentedVariants = tv({
 });
 
 export const chipVariants = tv({
-	base: 'focus-ring inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border px-3.5 text-callout whitespace-nowrap transition-colors duration-(--duration-fast) disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-3.5',
+	base: "focus-ring relative inline-flex h-9 shrink-0 after:absolute after:-inset-y-1 after:inset-x-0 after:content-[''] items-center justify-center gap-1.5 rounded-full border px-3.5 text-callout whitespace-nowrap transition-colors duration-(--duration-fast) disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-3.5",
 	variants: {
 		selected: {
 			true: 'border-primary/60 bg-info-tint text-primary',
@@ -249,7 +249,7 @@ export const chipVariants = tv({
 
 export const choiceCardVariants = tv({
 	slots: {
-		root: 'flex cursor-pointer gap-3 rounded-xl border p-3.5 transition-colors duration-(--duration-fast) has-focus-visible:ring-3 has-focus-visible:ring-ring/50',
+		root: 'flex cursor-pointer gap-3 rounded-xl border p-3.5 transition-colors duration-(--duration-fast) has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring',
 		indicator:
 			'mt-0.5 grid size-[1.125rem] shrink-0 place-items-center rounded-full border-2 transition-colors',
 		dot: 'size-2 rounded-full bg-primary-foreground transition-transform'

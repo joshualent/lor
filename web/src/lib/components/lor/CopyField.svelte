@@ -37,7 +37,7 @@
 	<div
 		class="flex items-start gap-2 rounded-lg border border-border bg-background/60 py-2 pr-1.5 pl-3"
 	>
-		<code {id} class="min-w-0 flex-1 py-1 text-[13px] break-all whitespace-pre-wrap select-all"
+		<code {id} class="min-w-0 flex-1 py-1 text-[13px] wrap-anywhere whitespace-pre-wrap select-all"
 			>{value}</code
 		>
 		<Button variant="ghost" size="icon-sm" onclick={copy} aria-label={label}>

@@ -2,6 +2,7 @@
 	// A form field: label, control, and a hint or error underneath.
 	import type { Snippet } from 'svelte';
 	import { Label } from '#lib/components/ui/label/index.js';
+	import { setFieldContext } from '#lib/design/field-context.js';
 
 	let {
 		label,
@@ -18,6 +19,18 @@
 		optional?: boolean;
 		children: Snippet;
 	} = $props();
+
+	setFieldContext({
+		get id() {
+			return forId;
+		},
+		get describedBy() {
+			return error ? `${forId}-error` : hint ? `${forId}-hint` : undefined;
+		},
+		get invalid() {
+			return !!error;
+		}
+	});
 </script>
 
 <div class="space-y-2" data-slot="field">

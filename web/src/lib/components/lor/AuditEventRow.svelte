@@ -70,7 +70,7 @@
 					<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-footnote">
 						{#each details as [k, v] (k)}
 							<dt class="text-muted-foreground">{k}</dt>
-							<dd class="min-w-0 font-mono break-all text-foreground">{v}</dd>
+							<dd class="min-w-0 font-mono wrap-anywhere text-foreground">{v}</dd>
 						{/each}
 					</dl>
 				{/if}

@@ -42,7 +42,7 @@
 	{#snippet subtitle()}Temporary, approved SSH access for your agents.{/snippet}
 	<div class="space-y-4">
 		{#if toRequest}
-			<Callout tone="warning" icon={Inbox} title="A request is waiting">
+			<Callout tone="info" icon={Inbox} title="Sign in to review this request">
 				You'll go straight to it after signing in.
 			</Callout>
 		{/if}

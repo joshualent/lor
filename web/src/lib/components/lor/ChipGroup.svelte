@@ -39,9 +39,22 @@
 		onchange?.(value);
 	}
 	const chipClass = (selected: boolean) => chipVariants({ selected });
+
+	let el = $state<HTMLElement | null>(null);
+	$effect(() => {
+		void value;
+		if (!scroll || !el) return;
+		const chip = el.querySelector<HTMLElement>('[aria-checked="true"]');
+		if (!chip) return;
+		const left = chip.offsetLeft - el.offsetLeft;
+		if (left < el.scrollLeft || left + chip.offsetWidth > el.scrollLeft + el.clientWidth) {
+			el.scrollTo({ left: left - 16, behavior: 'instant' });
+		}
+	});
 </script>
 
 <div
+	bind:this={el}
 	role="radiogroup"
 	aria-label={label}
 	aria-labelledby={labelledby}

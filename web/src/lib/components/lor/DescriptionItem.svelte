@@ -34,7 +34,7 @@
 		class={cn(
 			'min-w-0 break-words text-foreground',
 			layout === 'inline' ? 'text-right' : '',
-			mono ? 'font-mono text-callout break-all' : 'text-body'
+			mono ? 'font-mono text-callout wrap-anywhere' : 'text-body'
 		)}
 	>
 		{@render children()}

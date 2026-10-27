@@ -5,6 +5,7 @@
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
+	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import { listRowVariants } from '#lib/design/variants.js';
 	import { cn } from '#lib/utils.js';
 
@@ -84,10 +85,16 @@
 	{:else if meta}
 		<span class={s.meta()}>{meta}</span>
 	{/if}
-	{#if showChevron}<ChevronRight class={s.chevron()} aria-hidden="true" />{/if}
+	{#if expanded !== undefined}
+		<ChevronDown
+			class="{s.chevron()} {expanded ? 'rotate-180' : ''}"
+			aria-hidden="true"
+			data-slot="disclosure"
+		/>
+	{:else if showChevron}<ChevronRight class={s.chevron()} aria-hidden="true" />{/if}
 {/snippet}
 
-<li class={cn(s.root(), className)} data-slot="list-row" {...rest}>
+<li class={cn(s.root(), expanded && 'bg-card-hover/60', className)} data-slot="list-row" {...rest}>
 	<div class="flex min-w-0 flex-1 flex-col">
 		{#if href && !disabled}
 			<a {href} class={s.main()} aria-label={label}>{@render body()}</a>

@@ -137,7 +137,10 @@
 
 			<Section title="Time">
 				<Card>
-					<div class="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="extension-times">
+					<div
+						class="grid grid-cols-[1fr_auto_1fr] items-center gap-x-3"
+						data-testid="extension-times"
+					>
 						<div>
 							<p class="text-footnote text-muted-foreground">Now ends</p>
 							<p class="text-headline nums">{formatClock(end, clock.now)}</p>
@@ -145,7 +148,7 @@
 								{formatCountdown(end, clock.now)} left
 							</p>
 						</div>
-						<ArrowRight class="mx-1 size-5 text-icon-muted" aria-label="would become" />
+						<ArrowRight class="size-5 text-icon-muted" aria-label="would become" />
 						<div>
 							<p class="text-footnote text-muted-foreground">If approved</p>
 							<p class="text-headline text-primary nums">{formatClock(would, clock.now)}</p>
@@ -167,9 +170,12 @@
 			</Section>
 
 			<ActionBar>
+				<Button size="lg" variant="outline" disabled={busy} onclick={() => (denyOpen = true)}
+					>Deny</Button
+				>
 				<Button
 					size="lg"
-					class="sm:flex-1"
+					class="h-auto min-h-12 flex-1 py-2 leading-snug whitespace-normal"
 					disabled={busy || !durationValid}
 					onclick={approve}
 					data-testid="approve-extension"
@@ -177,9 +183,6 @@
 					{#if busy}<Spinner />{:else}<KeyRound />{/if}
 					{busy ? 'Waiting for passkey…' : `Extend ${g.host.name} by ${formatDuration(duration)}`}
 				</Button>
-				<Button size="lg" variant="outline" disabled={busy} onclick={() => (denyOpen = true)}
-					>Deny</Button
-				>
 			</ActionBar>
 		{:else}
 			<Section title="Outcome">

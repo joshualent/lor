@@ -170,6 +170,19 @@
 			<Callout tone="warning" title="Host key scan failed">{q.data.scan_error}</Callout>
 		{/if}
 
+		{#if !h.host_key_fingerprint}
+			<Callout tone="warning" title="No host key yet">
+				Grants need one. Check that the host is reachable on <span class="font-mono"
+					>{h.address}</span
+				>, then rescan.
+				{#snippet action()}
+					<Button size="sm" disabled={busy !== null} onclick={rescan}
+						>{#if busy === 'scan'}<Spinner />{:else}<RefreshCw />{/if} Rescan key</Button
+					>
+				{/snippet}
+			</Callout>
+		{/if}
+
 		<Warnings warnings={h.warnings} level={h.max_level} />
 
 		<Section title="Settings">
@@ -293,53 +306,51 @@
 			{/if}
 		</Section>
 
-		<Section
-			title="Host key"
-			footnote="Compare it with the fingerprint the bootstrap script prints."
-		>
-			{#snippet action()}
-				<Button size="sm" variant="ghost" disabled={busy !== null} onclick={rescan}
-					>{#if busy === 'scan'}<Spinner />{:else}<RefreshCw />{/if} Rescan</Button
-				>
-			{/snippet}
-			<div class="space-y-3">
-				{#if h.host_key_fingerprint}
-					<DescriptionList>
-						<DescriptionItem label="Fingerprint (ed25519)" layout="stacked" mono
-							>{h.host_key_fingerprint}</DescriptionItem
-						>
-						{#if h.host_key_seen_at}
-							<DescriptionItem label="Scanned">
-								<span title={formatTimestamp(Date.parse(h.host_key_seen_at))}
-									>{formatAgo(Date.parse(h.host_key_seen_at), clock.now)}</span
-								>
-							</DescriptionItem>
-						{/if}
-					</DescriptionList>
-				{:else}
-					<Callout tone="warning" title="No host key yet">
-						Grants need one. Check that the host is reachable on {h.address}, then rescan.
-					</Callout>
-				{/if}
-				{#if scan?.changed}
-					<div data-testid="key-changed">
-						<Callout tone="danger" title="The host key changed">
-							<p>Was <code class="break-all">{scan.previous_fingerprint}</code></p>
-							<p>Now <code class="break-all">{scan.fingerprint}</code></p>
-							<p class="mt-2 text-muted-foreground">
-								Only accept it if you rebuilt or re-keyed this host. Otherwise something is
-								impersonating it.
-							</p>
-							{#snippet action()}
-								<Button disabled={busy !== null} onclick={acceptKey}
-									>{#if busy === 'accept'}<Spinner />{:else}<KeyRound />{/if} Accept new key</Button
-								>
-							{/snippet}
-						</Callout>
-					</div>
-				{/if}
-			</div>
-		</Section>
+		{#if h.host_key_fingerprint || scan?.changed}
+			<Section
+				title="Host key"
+				footnote="Compare it with the fingerprint the bootstrap script prints."
+			>
+				{#snippet action()}
+					<Button size="sm" variant="ghost" disabled={busy !== null} onclick={rescan}
+						>{#if busy === 'scan'}<Spinner />{:else}<RefreshCw />{/if} Rescan</Button
+					>
+				{/snippet}
+				<div class="space-y-3">
+					{#if h.host_key_fingerprint}
+						<DescriptionList>
+							<DescriptionItem label="Fingerprint (ed25519)" layout="stacked" mono
+								>{h.host_key_fingerprint}</DescriptionItem
+							>
+							{#if h.host_key_seen_at}
+								<DescriptionItem label="Scanned">
+									<span title={formatTimestamp(Date.parse(h.host_key_seen_at))}
+										>{formatAgo(Date.parse(h.host_key_seen_at), clock.now)}</span
+									>
+								</DescriptionItem>
+							{/if}
+						</DescriptionList>
+					{/if}
+					{#if scan?.changed}
+						<div data-testid="key-changed">
+							<Callout tone="danger" title="The host key changed">
+								<p>Was <code class="wrap-anywhere">{scan.previous_fingerprint}</code></p>
+								<p>Now <code class="wrap-anywhere">{scan.fingerprint}</code></p>
+								<p class="mt-2 text-muted-foreground">
+									Only accept it if you rebuilt or re-keyed this host. Otherwise something is
+									impersonating it.
+								</p>
+								{#snippet action()}
+									<Button disabled={busy !== null} onclick={acceptKey}
+										>{#if busy === 'accept'}<Spinner />{:else}<KeyRound />{/if} Accept new key</Button
+									>
+								{/snippet}
+							</Callout>
+						</div>
+					{/if}
+				</div>
+			</Section>
+		{/if}
 
 		<Section
 			title="Bootstrap"

@@ -2,6 +2,7 @@
 	// On/off control for settings (bits-ui Switch: role="switch", Space toggles).
 	import { Switch as SwitchPrimitive } from 'bits-ui';
 	import { cn, type WithoutChildrenOrChild } from '#lib/utils.js';
+	import { useFieldAria } from '#lib/design/field-context.js';
 
 	let {
 		ref = $bindable(null),
@@ -9,6 +10,8 @@
 		class: className,
 		...restProps
 	}: WithoutChildrenOrChild<SwitchPrimitive.RootProps> = $props();
+	const fieldAria = useFieldAria();
+	const aria = $derived(fieldAria(restProps.id));
 </script>
 
 <SwitchPrimitive.Root
@@ -19,6 +22,7 @@
 		'peer focus-ring relative inline-flex h-6 w-10 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors duration-(--duration-fast) disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input after:absolute after:-inset-2',
 		className
 	)}
+	{...aria}
 	{...restProps}
 >
 	<SwitchPrimitive.Thumb

@@ -36,14 +36,20 @@
 	</Dialog.Root>
 {:else}
 	<Drawer.Root bind:open>
-		<Drawer.Content>
-			<div class="mx-auto w-full max-w-lg overflow-y-auto px-4 pb-2">
-				<Drawer.Header class="px-0 pt-5 text-left">
+		<Drawer.Content class="max-h-[90dvh]">
+			<!-- Header and footer stay put; only the body scrolls. -->
+			<div class="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col px-4">
+				<Drawer.Header class="shrink-0 px-0 pt-5 text-left">
 					<Drawer.Title>{title}</Drawer.Title>
 					{#if description}<Drawer.Description>{description}</Drawer.Description>{/if}
 				</Drawer.Header>
-				{@render children?.()}
-				<Drawer.Footer class="px-0 pb-[max(1rem,env(safe-area-inset-bottom))]"
+				{#if children}
+					<div class="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
+						{@render children()}
+					</div>
+				{/if}
+				<Drawer.Footer
+					class="shrink-0 border-t border-separator px-0 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
 					>{@render footer()}</Drawer.Footer
 				>
 			</div>

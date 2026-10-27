@@ -76,7 +76,12 @@ Each tone is a triple: `--<tone>` (text/icon), `--<tone>-tint` (background),
 | `danger` (red) | risk to Lor itself · refused or ended by you · destructive | Lor infra, Denied, Revoked, changed host key, countdown in the last minute, Revoke buttons |
 | `info` (blue, = accent hue) | offers, informational | Offered, "Offer created", passkeys |
 | `neutral` (grey) | ended normally, inactive, default | Expired, Released, Timed out, Disabled |
-| `violet`, `teal` | audit categories only (agents; hosts and certificates) | never a status |
+| `violet`, `teal` | audit categories only (agents; hosts and certificates) | never a status, never outside the audit log |
+
+Identity tiles outside the audit log (hosts, agents, certificates) are
+neutral unless the item carries risk (Lor infra = danger, hypervisor =
+warning) or needs attention (not enrolled = warning). An unclaimed offer's
+time bar is blue (`info`); an active grant's is green until it's expiring.
 
 Server-computed warnings (`lor_infra`, `root_access`, `hypervisor`) use the
 tone of their server `severity` and are shown exactly as the server words
@@ -113,8 +118,12 @@ The merge helpers (`cn()` and tailwind-variants) are configured
 - Motion: `--duration-fast` 120 ms, `--duration-medium` 200 ms,
   `--ease-standard`. Only color, opacity and small transforms animate.
   `prefers-reduced-motion` turns animations and transitions off globally.
-- Focus: `focus-ring` (3 px accent ring at 50%) for controls,
-  `focus-ring-inset` for full-width rows inside cards.
+- Focus: a solid 2 px accent outline with a 2 px offset (`focus-ring`, and
+  built into buttons), so it shows on every surface including the accent
+  button; `focus-ring-inset` (solid inset ring) for full-width rows inside
+  cards. Inputs keep their accent border + halo.
+- Touch targets: 40 px controls; small buttons (`sm`, `icon-sm`) and chips
+  keep their look but get an invisible 44 px hit area (`after:` inset).
 
 ## Components
 
@@ -126,7 +135,7 @@ The merge helpers (`cn()` and tailwind-variants) are configured
 | `PageHeader` | back link (detail pages), leading tile, title (sets `<title>`), subtitle, `meta` badges, `actions` |
 | `Section` / `SectionHeader` | a page region: title, count, description, action, footnote |
 | `Card` | painted surface for free-form content (forms, summaries) |
-| `ActionBar` | the page's decision buttons; sticky at the bottom on phones |
+| `ActionBar` | the page's decision buttons in one row (secondary first, primary `flex-1`, label may wrap); sticky at the bottom on phones |
 | `AuthCard` | signed-out screens (login, setup) |
 
 ### Lists and details
@@ -134,9 +143,9 @@ The merge helpers (`cn()` and tailwind-variants) are configured
 | Component | Purpose |
 |---|---|
 | `List` | grouped inset list (`<ul>`/`<ol>`, card surface, hairline dividers) |
-| `ListRow` | link (`href`), button (`onclick`) or static row: `leading`, title/subtitle, `meta`, chevron, separate `trailing` controls, disclosure (`expanded`/`controls`), `tone`, `density` |
+| `ListRow` | link (`href`), button (`onclick`) or static row: `leading`, title/subtitle, `meta`, chevron, separate `trailing` controls, disclosure (`expanded`/`controls`: a chevron-down that turns, distinct from the navigation chevron), `tone`, `density` |
 | `DescriptionList` / `DescriptionItem` | label/value pairs, `inline` or `stacked`, `mono` |
-| `SettingsRow` | a setting with icon, description and a control (`Switch`, button) labelled via `for` |
+| `SettingsRow` | a setting with icon, description and a control (`Switch`, button) labelled and described via `for` |
 | `AuditEventRow` | outcome-toned category icon, label, who · what · grant, time; discloses details |
 | `Timeline` | a grant's history with connecting line |
 | `CommandLog` | commands reported by the CLI, as plain text |
@@ -161,7 +170,7 @@ The merge helpers (`cn()` and tailwind-variants) are configured
 | `ChipGroup` | wrap-around or scrolling choice chips (durations, categories); radio group |
 | `SearchField` | filter input with icon and clear button |
 | `Toolbar` | groups filters above a list |
-| `Field` | label + control + hint/error |
+| `Field` | label + control + hint/error; the control gets `aria-describedby`/`aria-invalid` automatically (via `design/field-context.ts`) |
 | `ChoiceCard` | large radio option with explanation (access level) |
 | `DurationPicker` | presets + custom duration with validation |
 | `ui/button`, `ui/input`, `ui/textarea`, `ui/checkbox`, `ui/switch`, `ui/native-select`, `ui/label` | primitives |
@@ -178,7 +187,7 @@ The merge helpers (`cn()` and tailwind-variants) are configured
 | `ErrorState` | failed load: server message as is, retry, way out; 404-aware |
 | `ListSkeleton`, `PageSkeleton`, `ui/skeleton` | loading placeholders (`aria-busy` + "Loading…") |
 | `ui/spinner` | in-button progress (e.g. while a passkey prompt is open) |
-| `Confirm` | dialog on wide screens, bottom drawer on phones |
+| `Confirm` | dialog on wide screens, bottom drawer on phones (body scrolls, footer stays visible) |
 | `ui/sonner` | toasts with tone-colored icons |
 
 ## Patterns
@@ -197,7 +206,14 @@ The merge helpers (`cn()` and tailwind-variants) are configured
   and a `Confirm`. Danger rows in action lists use `tone="danger"`.
 - **States:** every query renders loading (skeleton), error (`ErrorState`
   with the server's message and a retry) and empty (`EmptyState` with the
-  next step) states.
+  next step) states. Ended things use final wording ("No commands were
+  reported"), never a promise ("appear here as …"). An empty state's action
+  is secondary when the page header already has the primary one.
+- **Agent words** are quoted (“…”) in previews and labelled unverified in
+  full (`UnverifiedText`); the command log says it's reported by the CLI.
+- **Detail pages put the live part first:** a grant shows time left and
+  actions, warnings, a pending extension, then the command log, then the
+  administrative details and history.
 - **Passkey actions** show a `KeyRound` icon, and `Spinner` + "Waiting for
   passkey…" while the prompt is open.
 

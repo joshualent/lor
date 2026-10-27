@@ -65,6 +65,8 @@ describe('text contrast (WCAG AA, 4.5:1)', () => {
 	}
 
 	it('primary button text', () => expectContrast('primary-foreground', 'primary', 4.5));
+	it('pending count on the Home nav item', () =>
+		expectContrast('primary-foreground', 'warning', 4.5));
 });
 
 describe('non-text contrast (3:1)', () => {
@@ -72,6 +74,8 @@ describe('non-text contrast (3:1)', () => {
 		it(`focus ring on ${s}`, () => expectContrast('ring', s, 3));
 		it(`muted icons on ${s}`, () => expectContrast('icon-muted', s, 3));
 	}
+	it('the sudo confirmation checkbox outline on its amber panel', () =>
+		expectContrast('warning', 'warning-tint', 3));
 	it('tone edges are visible against their tint', () => {
 		for (const t of tones) {
 			expect(contrast(vars[`${t}-edge`], vars[`${t}-tint`])).toBeGreaterThan(1.2);

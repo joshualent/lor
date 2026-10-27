@@ -4,6 +4,7 @@
 	// the title toggles it.
 	import type { Component, Snippet } from 'svelte';
 	import type { Tone } from '#lib/design/variants.js';
+	import { setFieldContext } from '#lib/design/field-context.js';
 	import IconTile from './IconTile.svelte';
 
 	let {
@@ -25,6 +26,16 @@
 		/** Extra content under the description. */
 		children?: Snippet;
 	} = $props();
+
+	setFieldContext({
+		get id() {
+			return forId;
+		},
+		get describedBy() {
+			return forId && description ? `${forId}-desc` : undefined;
+		},
+		invalid: false
+	});
 </script>
 
 <li class="flex min-h-14 items-center gap-3 px-4 py-3" data-slot="settings-row">

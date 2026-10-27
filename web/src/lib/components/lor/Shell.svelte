@@ -90,7 +90,7 @@
 					{#each nav as n (n.href)}
 						<a
 							href={n.href}
-							class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm whitespace-nowrap no-underline! focus-ring transition-colors {active(
+							class="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1.5 text-sm whitespace-nowrap no-underline! focus-ring transition-colors sm:px-2.5 {active(
 								n.href
 							)
 								? 'bg-secondary text-foreground'

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { useFieldAria } from "#lib/design/field-context.js";
 	import { cn, type WithElementRef, type WithoutChildren } from "#lib/utils.js";
 	import type { HTMLTextareaAttributes } from "svelte/elements";
 
@@ -9,6 +10,8 @@
 		"data-slot": dataSlot = "textarea",
 		...restProps
 	}: WithoutChildren<WithElementRef<HTMLTextareaAttributes>> = $props();
+	const fieldAria = useFieldAria();
+	const aria = $derived(fieldAria(restProps.id));
 </script>
 
 <textarea
@@ -19,4 +22,5 @@
 		className
 	)}
 	bind:value
-	{...restProps}></textarea>
+	{...aria}
+		{...restProps}></textarea>

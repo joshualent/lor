@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { useFieldAria } from "#lib/design/field-context.js";
 	import { cn, type WithElementRef } from "#lib/utils.js";
 	import type { HTMLInputAttributes, HTMLInputTypeAttribute } from "svelte/elements";
 
@@ -18,6 +19,8 @@
 		"data-slot": dataSlot = "input",
 		...restProps
 	}: Props = $props();
+	const fieldAria = useFieldAria();
+	const aria = $derived(fieldAria(restProps.id));
 </script>
 
 {#if type === "file"}
@@ -31,6 +34,7 @@
 		type="file"
 		bind:files
 		bind:value
+		{...aria}
 		{...restProps}
 	/>
 {:else}
@@ -43,6 +47,7 @@
 		)}
 		{type}
 		bind:value
+		{...aria}
 		{...restProps}
 	/>
 {/if}

@@ -5,13 +5,29 @@
 	import { remainingFraction, remainingTone } from '#lib/status.js';
 	import { cn } from '#lib/utils.js';
 
-	let { start, end, class: className }: { start: string; end: string; class?: string } = $props();
+	let {
+		start,
+		end,
+		offer = false,
+		class: className
+	}: {
+		start: string;
+		end: string;
+		/** An unclaimed offer (info tone). */ offer?: boolean;
+		class?: string;
+	} = $props();
 	const startMs = $derived(Date.parse(start));
 	const endMs = $derived(Date.parse(end));
 	const left = $derived(remainingFraction(startMs, endMs, clock.now));
 	const tone = $derived(remainingTone(endMs, clock.now));
 	const fill = $derived(
-		tone === 'danger' ? 'bg-destructive' : tone === 'warning' ? 'bg-warning' : 'bg-success'
+		tone === 'danger'
+			? 'bg-destructive'
+			: tone === 'warning'
+				? 'bg-warning'
+				: offer
+					? 'bg-info'
+					: 'bg-success'
 	);
 </script>
 

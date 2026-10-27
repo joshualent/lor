@@ -1,6 +1,8 @@
 <script lang="ts">
 	import KeyRound from '@lucide/svelte/icons/key-round';
 	import Send from '@lucide/svelte/icons/send';
+	import Bot from '@lucide/svelte/icons/bot';
+	import Server from '@lucide/svelte/icons/server';
 	import { page } from '$app/state';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
@@ -21,6 +23,9 @@
 	import CopyField from '#lib/components/lor/CopyField.svelte';
 	import DurationPicker from '#lib/components/lor/DurationPicker.svelte';
 	import Field from '#lib/components/lor/Field.svelte';
+	import EmptyState from '#lib/components/lor/EmptyState.svelte';
+	import ErrorState from '#lib/components/lor/ErrorState.svelte';
+	import PageSkeleton from '#lib/components/lor/PageSkeleton.svelte';
 	import PageHeader from '#lib/components/lor/PageHeader.svelte';
 	import Section from '#lib/components/lor/Section.svelte';
 	import Warnings from '#lib/components/lor/Warnings.svelte';
@@ -117,19 +122,38 @@
 			<Button variant="ghost" href="/">Done</Button>
 		</div>
 	</div>
+{:else if agents.isPending || hosts.isPending}
+	<PageSkeleton header={false} sections={2} />
+{:else if agents.isError || hosts.isError}
+	<ErrorState
+		variant="inset"
+		error={agents.error ?? hosts.error}
+		onretry={() => {
+			agents.refetch();
+			hosts.refetch();
+		}}
+	/>
+{:else if usableAgents.length === 0 || usableHosts.length === 0}
+	<EmptyState
+		icon={usableAgents.length === 0 ? Bot : Server}
+		title={usableAgents.length === 0 ? 'No enrolled agent yet' : 'No host ready for access'}
+		description={usableAgents.length === 0
+			? 'Add an agent and run its enroll command first.'
+			: 'A host needs to be enabled and have a scanned host key.'}
+	>
+		{#snippet action()}
+			<Button variant="secondary" href={usableAgents.length === 0 ? '/agents' : '/hosts'}
+				>{usableAgents.length === 0 ? 'Go to Agents' : 'Go to Hosts'}</Button
+			>
+		{/snippet}
+	</EmptyState>
 {:else}
 	<form class="space-y-7" onsubmit={submit}>
 		<!-- Locked while the passkey prompt is open: the action is already fixed. -->
 		<fieldset disabled={busy} class="contents">
 			<Section title="Who and where">
 				<Card class="space-y-5">
-					<Field
-						label="Agent"
-						for="agent"
-						hint={agents.isSuccess && usableAgents.length === 0
-							? 'No enrolled agents yet. Add one on the Agents page.'
-							: undefined}
-					>
+					<Field label="Agent" for="agent">
 						<NativeSelect id="agent" bind:value={agentId} required>
 							<option value={null} disabled>Choose an agent</option>
 							{#each usableAgents as a (a.id)}<option value={a.id}>{a.name}</option>{/each}
@@ -176,7 +200,7 @@
 				</Card>
 			</Section>
 
-			<Section title="Note">
+			<Section>
 				<Card>
 					<Field label="Note" for="note" optional hint="For your records; shown on the grant.">
 						<Textarea
@@ -205,7 +229,11 @@
 							<label
 								class="flex cursor-pointer items-start gap-3 rounded-lg border border-warning-edge bg-warning-tint px-3 py-2.5"
 							>
-								<Checkbox bind:checked={confirmed} id="confirm-sudo-offer" class="mt-0.5" />
+								<Checkbox
+									bind:checked={confirmed}
+									id="confirm-sudo-offer"
+									class="mt-0.5 border-warning bg-transparent"
+								/>
 								<span class="text-callout">I understand this gives root on {host.name}</span>
 							</label>
 						{/if}

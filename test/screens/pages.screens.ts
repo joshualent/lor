@@ -39,13 +39,20 @@ async function settle(p: Page) {
 async function shoot(
 	name: string,
 	path: string,
-	opts: { prepare?: (p: Page) => Promise<void>; on?: Page; fullPage?: boolean } = {}
+	opts: {
+		prepare?: (p: Page) => Promise<void>;
+		on?: Page;
+		fullPage?: boolean;
+		widths?: ('desktop' | 'phone')[];
+	} = {}
 ) {
 	const p = opts.on ?? page;
+	const widths = opts.widths ?? ['desktop', 'phone'];
 	for (const [suffix, size] of [
 		['desktop', DESKTOP],
 		['phone', PHONE]
 	] as const) {
+		if (!widths.includes(suffix)) continue;
 		await p.setViewportSize(size);
 		await p.goto(path);
 		await settle(p);
@@ -310,6 +317,15 @@ test('screens', async () => {
 	await shoot('consent-sudo-infra', `/r/${ids.caddy}`);
 	await shoot('consent-sudo-hypervisor', `/r/${ids.pve}`);
 	await shoot('consent-user', `/r/${ids.mediaPending}`);
+	// What a phone shows first: the sticky action bar in place.
+	await shoot('consent-sudo-infra-viewport', `/r/${ids.caddy}`, {
+		fullPage: false,
+		widths: ['phone']
+	});
+	await shoot('consent-user-viewport', `/r/${ids.mediaPending}`, {
+		fullPage: false,
+		widths: ['phone']
+	});
 	await shoot('consent-deny', `/r/${ids.mediaPending}`, {
 		fullPage: false,
 		prepare: async (p) => {
@@ -335,7 +351,29 @@ test('screens', async () => {
 	await shoot('host-caddy-infra', '/hosts/caddy');
 	await shoot('host-no-key', '/hosts/docker-vm');
 	await shoot('agents', '/agents');
+	await shoot('agents-sheet', '/agents', {
+		fullPage: false,
+		prepare: async (p) => {
+			await p.getByRole('button', { name: /claude/ }).first().click();
+		}
+	});
+	await shoot('hosts-add', '/hosts', {
+		fullPage: false,
+		prepare: async (p) => {
+			await p.getByRole('button', { name: 'Add host' }).first().click();
+		}
+	});
+	await shoot('host-edit', '/hosts/pve', {
+		prepare: async (p) => {
+			await p.getByRole('button', { name: 'Edit' }).click();
+		}
+	});
 	await shoot('audit', '/audit');
+	await shoot('audit-filtered', '/audit?action=grant.', {
+		prepare: async (p) => {
+			await p.locator('[data-action="grant.denied"]').first().getByRole('button').click();
+		}
+	});
 	await shoot('settings', '/settings');
 	await shoot('error-grant-404', '/grants/99999');
 	await shoot('error-host-404', '/hosts/nope');

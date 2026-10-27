@@ -94,8 +94,10 @@
 				{#snippet leading()}<IconTile icon={look.icon} tone={look.tone} />{/snippet}
 				{#snippet titleContent()}{h.name}{/snippet}
 				{#snippet subtitleContent()}
-					<span class="font-mono text-footnote">{h.address}</span>
-					<span class="ml-1.5">{h.max_level === 'sudo' ? 'up to sudo' : 'standard user only'}</span>
+					<span class="block font-mono text-footnote">{h.address}</span>
+					<span class="block text-footnote"
+						>{h.max_level === 'sudo' ? 'Up to sudo' : 'Standard user only'}</span
+					>
 				{/snippet}
 				{#snippet metaContent()}
 					{#if look.badges.length}
@@ -119,7 +121,9 @@
 		title="No hosts yet"
 		description="Add a host by its LAN IP, then run its bootstrap one-liner so agents can log in."
 	>
-		{#snippet action()}<Button onclick={() => (open = true)}><Plus /> Add host</Button>{/snippet}
+		{#snippet action()}<Button variant="secondary" onclick={() => (open = true)}
+				><Plus /> Add host</Button
+			>{/snippet}
 	</EmptyState>
 {:else}
 	<div class="space-y-7">

@@ -4,6 +4,7 @@
 	import TimerReset from '@lucide/svelte/icons/timer-reset';
 	import Clock from '@lucide/svelte/icons/clock';
 	import ShieldCheck from '@lucide/svelte/icons/shield-check';
+	import SquareTerminal from '@lucide/svelte/icons/square-terminal';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
 	import { api, call } from '#lib/api/client.js';
@@ -27,7 +28,6 @@
 	import PageHeader from '#lib/components/lor/PageHeader.svelte';
 	import PageSkeleton from '#lib/components/lor/PageSkeleton.svelte';
 	import Section from '#lib/components/lor/Section.svelte';
-	import StatusBadge from '#lib/components/lor/StatusBadge.svelte';
 
 	const qc = useQueryClient();
 	const q = createQuery(() => ({
@@ -69,7 +69,6 @@
 	const pendingCount = $derived(
 		(d?.pending_requests.length ?? 0) + (d?.pending_extensions.length ?? 0)
 	);
-	const open = $derived(d ? [...d.active, ...d.offered] : []);
 	const summary = $derived.by(() => {
 		if (!d) return undefined;
 		const parts = [];
@@ -128,7 +127,7 @@
 								</span>
 							{/snippet}
 							{#snippet subtitleContent()}
-								<span class="line-clamp-2">{g.reason}</span>
+								<span class="line-clamp-2">“{g.reason}”</span>
 								<span class="mt-1 flex items-center gap-1.5 text-footnote">
 									<Clock class="size-3.5 shrink-0" aria-hidden="true" />
 									{[
@@ -152,7 +151,7 @@
 								{x.grant.host.name}
 							{/snippet}
 							{#snippet subtitleContent()}
-								<span class="line-clamp-2">{x.extension.reason}</span>
+								<span class="line-clamp-2">“{x.extension.reason}”</span>
 								<span class="mt-1 flex items-center gap-1.5 text-footnote">
 									<Clock class="size-3.5 shrink-0" aria-hidden="true" />
 									+{formatDuration(x.extension.requested_duration_s)}
@@ -164,57 +163,72 @@
 			</Section>
 		{/if}
 
-		<Section title="Access" count={open.length || undefined}>
-			{#if open.length === 0}
+		{#snippet grantRow(g: Summary)}
+			{@const look = hostLook(g.host)}
+			<ListRow href="/grants/{g.id}" label="{g.host.name}, {g.agent.name}">
+				{#snippet leading()}<IconTile icon={look.icon} tone={look.tone} />{/snippet}
+				{#snippet titleContent()}
+					<span class="flex flex-wrap items-center gap-x-2 gap-y-1">
+						{g.host.name}
+						{#if g.level === 'sudo'}<LevelBadge level="sudo" short />{/if}
+					</span>
+				{/snippet}
+				{#snippet subtitleContent()}
+					{g.agent.name}{g.status === 'offered' ? ' · not claimed yet' : ''}
+				{/snippet}
+				{#snippet metaContent()}<Countdown end={g.valid_before} variant="badge" />{/snippet}
+				{#snippet trailing()}
+					{@render grantActions(g, 'hidden gap-1 sm:flex')}
+				{/snippet}
+				{#if g.last_command}
+					<p class="-mt-1.5 flex min-w-0 items-baseline gap-1.5 pr-4 pb-3 pl-16 text-footnote">
+						<SquareTerminal
+							class="size-3.5 shrink-0 self-center text-icon-muted"
+							aria-label="Last command"
+						/>
+						<code class="min-w-0 truncate text-foreground/85"
+							>{formatArgv(g.last_command.argv)}</code
+						>
+						<span class="shrink-0 text-muted-foreground"
+							>· {formatAgo(Date.parse(g.last_command.reported_at), clock.now)}</span
+						>
+					</p>
+				{/if}
+				{@render grantActions(g, 'flex gap-1 px-4 pb-3 pl-16 sm:hidden')}
+			</ListRow>
+		{/snippet}
+
+		<Section title="Active" count={d.active.length || undefined}>
+			{#if d.active.length === 0}
 				<EmptyState
 					icon={ShieldCheck}
 					title="No agent has access"
 					description="Access starts when you approve a request or grant it ahead of time."
 				>
 					{#snippet action()}
-						<Button variant="secondary" href="/grants/new"><Plus /> Grant access</Button>
+						{#if d.offered.length === 0}
+							<Button variant="secondary" href="/grants/new"><Plus /> Grant access</Button>
+						{/if}
 					{/snippet}
 				</EmptyState>
 			{:else}
-				<List data-testid="open-grants">
-					{#each open as g (g.id)}
-						{@const look = hostLook(g.host)}
-						<ListRow href="/grants/{g.id}" label="{g.host.name}, {g.agent.name}">
-							{#snippet leading()}<IconTile icon={look.icon} tone={look.tone} />{/snippet}
-							{#snippet titleContent()}
-								<span class="flex flex-wrap items-center gap-x-2 gap-y-1">
-									{g.host.name}
-									{#if g.level === 'sudo'}<LevelBadge level="sudo" short />{/if}
-								</span>
-							{/snippet}
-							{#snippet subtitleContent()}
-								<span class="block"
-									>{g.agent.name}{g.status === 'offered' ? ' · not claimed yet' : ''}</span
-								>
-								{#if g.last_command}
-									<span class="mt-0.5 flex min-w-0 items-baseline gap-1.5 text-footnote">
-										<code class="truncate text-foreground/80"
-											>{formatArgv(g.last_command.argv)}</code
-										>
-										<span class="shrink-0"
-											>· {formatAgo(Date.parse(g.last_command.reported_at), clock.now)}</span
-										>
-									</span>
-								{/if}
-							{/snippet}
-							{#snippet metaContent()}
-								{#if g.status === 'offered'}<StatusBadge status="offered" />{/if}
-								<Countdown end={g.valid_before} variant="badge" />
-							{/snippet}
-							{#snippet trailing()}
-								{@render grantActions(g, 'hidden gap-1 sm:flex')}
-							{/snippet}
-							{@render grantActions(g, 'flex gap-1 px-4 pb-3 pl-16 sm:hidden')}
-						</ListRow>
-					{/each}
+				<List data-testid="active-grants">
+					{#each d.active as g (g.id)}{@render grantRow(g)}{/each}
 				</List>
 			{/if}
 		</Section>
+
+		{#if d.offered.length}
+			<Section
+				title="Offers"
+				count={d.offered.length}
+				footnote="Pre-approved access. The agent claims it on its next lor ssh or lor request."
+			>
+				<List data-testid="offers">
+					{#each d.offered as g (g.id)}{@render grantRow(g)}{/each}
+				</List>
+			</Section>
+		{/if}
 
 		<Section title="Recent activity">
 			{#snippet action()}

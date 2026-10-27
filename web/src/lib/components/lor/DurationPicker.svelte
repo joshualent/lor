@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { DURATION_CHOICES, isLong, parseDuration } from '#lib/durations.js';
+	import { DURATION_CHOICES, isLong, parseDuration, type DurationChoice } from '#lib/durations.js';
 	import { formatDuration } from '#lib/format.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import ChipGroup from './ChipGroup.svelte';
@@ -11,12 +11,23 @@
 		valid = $bindable(),
 		max,
 		id = 'duration',
-		label = 'Duration'
-	}: { value: number; valid?: boolean; max?: number; id?: string; label?: string } = $props();
+		label = 'Duration',
+		choices = DURATION_CHOICES,
+		placeholder = 'e.g. 90m, 2h, 3d'
+	}: {
+		value: number;
+		valid?: boolean;
+		max?: number;
+		id?: string;
+		label?: string;
+		/** Presets (default: the consent page's durations). */
+		choices?: DurationChoice[];
+		placeholder?: string;
+	} = $props();
 
 	let custom = $state(false);
 	let customText = $state('');
-	const presets = $derived(DURATION_CHOICES.filter((c) => !max || c.seconds <= max));
+	const presets = $derived(choices.filter((c) => !max || c.seconds <= max));
 	const isPreset = $derived(presets.some((c) => c.seconds === value));
 
 	$effect(() => {
@@ -81,7 +92,7 @@
 				{id}
 				value={customText}
 				oninput={onCustom}
-				placeholder="e.g. 90m, 2h, 3d"
+				{placeholder}
 				aria-label="Custom duration"
 				aria-invalid={customInvalid}
 				aria-describedby="{id}-hint"

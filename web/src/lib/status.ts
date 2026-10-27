@@ -111,7 +111,7 @@ export function agentLook(a: AgentFlags): { icon: Component; tone: Tone; badge: 
 		return { icon: Bot, tone: 'neutral', badge: { label: 'Disabled', tone: 'neutral' } };
 	if (!a.enrolled)
 		return { icon: Bot, tone: 'warning', badge: { label: 'Not enrolled', tone: 'warning' } };
-	return { icon: Bot, tone: 'violet', badge: null };
+	return { icon: Bot, tone: 'neutral', badge: null };
 }
 
 /** "admin:iPhone" → "iPhone", for "decided by". */

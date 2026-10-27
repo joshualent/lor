@@ -3,14 +3,13 @@
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { Input } from '#lib/components/ui/input/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
-	import { EXTEND_CHOICES, parseDuration } from '#lib/durations.js';
+	import { EXTEND_CHOICES } from '#lib/durations.js';
 	import { errorMessage, isCancel } from '#lib/errors.js';
 	import { clock } from '#lib/clock.svelte.js';
 	import { formatClock, formatDuration } from '#lib/format.js';
 	import { stepUp } from '#lib/webauthn.js';
-	import ChipGroup from './ChipGroup.svelte';
+	import DurationPicker from './DurationPicker.svelte';
 	import Confirm from './Confirm.svelte';
 
 	let {
@@ -22,19 +21,12 @@
 	}: { open: boolean; grantId: number; host: string; end: string; onDone: () => void } = $props();
 
 	let seconds = $state(3600);
-	let custom = $state('');
+	let valid = $state(true);
 	let busy = $state(false);
 
-	const chosen = $derived(custom.trim() ? parseDuration(custom) : seconds);
+	const chosen = $derived(valid ? seconds : null);
 	// Added time counts from the current end, not from now.
 	const newEnd = $derived(chosen ? Date.parse(end) + chosen * 1000 : null);
-	const options = $derived(
-		EXTEND_CHOICES.map((c) => ({
-			value: c.seconds,
-			label: c.label,
-			selected: !custom.trim() && seconds === c.seconds
-		}))
-	);
 
 	async function extend() {
 		if (!chosen) return;
@@ -43,7 +35,6 @@
 			await stepUp({ kind: 'extend_grant', grant_id: grantId, duration_s: chosen });
 			toast.success(`Extended ${host} by ${formatDuration(chosen)}`);
 			open = false;
-			custom = '';
 			onDone();
 		} catch (e) {
 			if (!isCancel(e)) toast.error(errorMessage(e));
@@ -59,20 +50,13 @@
 	description="Added time counts from the current end."
 >
 	<div class="space-y-4">
-		<ChipGroup
-			{options}
-			value={seconds}
+		<DurationPicker
+			bind:value={seconds}
+			bind:valid
+			choices={EXTEND_CHOICES}
+			id="extend-duration"
 			label="Add time"
-			onchange={(s) => {
-				seconds = s;
-				custom = '';
-			}}
-		/>
-		<Input
-			bind:value={custom}
-			placeholder="Custom, e.g. 90m or 2d"
-			aria-label="Custom extension"
-			class="max-w-56"
+			placeholder="e.g. 90m or 2d"
 		/>
 		<div class="flex items-center gap-2 rounded-lg bg-card px-3 py-2.5 text-callout">
 			{#if newEnd}
