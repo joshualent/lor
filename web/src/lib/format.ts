@@ -131,3 +131,8 @@ export function formatArgv(argv: string[]): string {
 	if (argv.length === 0) return '(interactive shell)';
 	return argv.join(' ');
 }
+
+/** Time of day for rows already grouped by day: "14:05" / "2:05 PM". */
+export function formatTimeOfDay(ms: number): string {
+	return new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}

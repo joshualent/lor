@@ -1,19 +1,33 @@
 <script lang="ts">
 	import Plus from '@lucide/svelte/icons/plus';
-	import ChevronRight from '@lucide/svelte/icons/chevron-right';
+	import Server from '@lucide/svelte/icons/server';
+	import Layers from '@lucide/svelte/icons/layers';
+	import ShieldAlert from '@lucide/svelte/icons/shield-alert';
 	import { goto } from '$app/navigation';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
 	import { api, call, type Level } from '#lib/api/client.js';
 	import { errorMessage } from '#lib/errors.js';
-	import { keys, fetchHosts } from '#lib/queries.js';
+	import { keys, fetchHosts, type Host } from '#lib/queries.js';
+	import { hostLook } from '#lib/status.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
-	import { Label } from '#lib/components/ui/label/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import Confirm from '#lib/components/lor/Confirm.svelte';
+	import EmptyState from '#lib/components/lor/EmptyState.svelte';
+	import ErrorState from '#lib/components/lor/ErrorState.svelte';
+	import Field from '#lib/components/lor/Field.svelte';
+	import IconTile from '#lib/components/lor/IconTile.svelte';
+	import List from '#lib/components/lor/List.svelte';
+	import ListRow from '#lib/components/lor/ListRow.svelte';
+	import ListSkeleton from '#lib/components/lor/ListSkeleton.svelte';
 	import PageHeader from '#lib/components/lor/PageHeader.svelte';
+	import SearchField from '#lib/components/lor/SearchField.svelte';
 	import Section from '#lib/components/lor/Section.svelte';
+	import SegmentedControl from '#lib/components/lor/SegmentedControl.svelte';
+	import SettingsRow from '#lib/components/lor/SettingsRow.svelte';
 
 	const qc = useQueryClient();
 	const hosts = createQuery(() => ({ queryKey: keys.hosts, queryFn: fetchHosts }));
@@ -25,6 +39,7 @@
 	let hypervisor = $state(false);
 	let lorInfra = $state(false);
 	let busy = $state(false);
+	let search = $state('');
 
 	async function add() {
 		busy = true;
@@ -53,61 +68,95 @@
 		}
 	}
 
-	function flags(h: { hypervisor: boolean; lor_infra: boolean; disabled: boolean }) {
-		return [
-			h.hypervisor && 'hypervisor',
-			h.lor_infra && 'Lor infrastructure',
-			h.disabled && 'disabled'
-		]
-			.filter(Boolean)
-			.join(' · ');
-	}
+	const all = $derived(hosts.data ?? []);
+	const matches = (h: Host) => {
+		const s = search.trim().toLowerCase();
+		return !s || h.name.toLowerCase().includes(s) || h.address.includes(s);
+	};
+	const enabled = $derived(all.filter((h) => !h.disabled && matches(h)));
+	const disabled = $derived(all.filter((h) => h.disabled && matches(h)));
+	const subtitle = $derived(
+		hosts.data
+			? `${all.length} ${all.length === 1 ? 'host' : 'hosts'}${all.some((h) => h.disabled) ? ` · ${all.filter((h) => h.disabled).length} disabled` : ''}`
+			: undefined
+	);
 </script>
 
-<PageHeader title="Hosts">
+<PageHeader title="Hosts" {subtitle}>
 	{#snippet actions()}<Button onclick={() => (open = true)}><Plus /> Add host</Button>{/snippet}
 </PageHeader>
 
-<Section>
-	{#if hosts.isPending}
-		<p class="text-muted-foreground">Loading…</p>
-	{:else if hosts.data?.length === 0}
-		<p class="text-muted-foreground">No hosts yet. Add one, then run its bootstrap one-liner.</p>
-	{:else if hosts.data}
-		<ul class="-my-2 divide-y divide-border">
-			{#each hosts.data as h (h.id)}
-				<li>
-					<a href="/hosts/{h.name}" class="flex items-center gap-3 py-3 no-underline!">
-						<div class="min-w-0 flex-1">
-							<p>
-								<span class="font-medium">{h.name}</span>
-								<span class="font-mono text-sm text-muted-foreground">{h.address}</span>
-							</p>
-							<p class="text-sm text-muted-foreground">
-								up to {h.max_level === 'sudo' ? 'sudo' : 'user'}{flags(h)
-									? ` · ${flags(h)}`
-									: ''}{h.host_key ? '' : ' · no host key yet'}
-							</p>
-						</div>
-						<ChevronRight class="size-4 text-muted-foreground" />
-					</a>
-				</li>
-			{/each}
-		</ul>
-	{/if}
-</Section>
+{#snippet hostRows(list: Host[])}
+	<List>
+		{#each list as h (h.id)}
+			{@const look = hostLook(h, true)}
+			<ListRow href="/hosts/{h.name}">
+				{#snippet leading()}<IconTile icon={look.icon} tone={look.tone} />{/snippet}
+				{#snippet titleContent()}{h.name}{/snippet}
+				{#snippet subtitleContent()}
+					<span class="font-mono text-footnote">{h.address}</span>
+					<span class="ml-1.5">{h.max_level === 'sudo' ? 'up to sudo' : 'standard user only'}</span>
+				{/snippet}
+				{#snippet metaContent()}
+					{#if look.badges.length}
+						<span class="flex flex-wrap justify-end gap-1">
+							{#each look.badges as b (b.label)}<Badge tone={b.tone}>{b.label}</Badge>{/each}
+						</span>
+					{/if}
+				{/snippet}
+			</ListRow>
+		{/each}
+	</List>
+{/snippet}
+
+{#if hosts.isPending}
+	<ListSkeleton rows={4} />
+{:else if hosts.isError}
+	<ErrorState error={hosts.error} onretry={() => hosts.refetch()} variant="inset" />
+{:else if all.length === 0}
+	<EmptyState
+		icon={Server}
+		title="No hosts yet"
+		description="Add a host by its LAN IP, then run its bootstrap one-liner so agents can log in."
+	>
+		{#snippet action()}<Button onclick={() => (open = true)}><Plus /> Add host</Button>{/snippet}
+	</EmptyState>
+{:else}
+	<div class="space-y-7">
+		{#if all.length > 4}
+			<SearchField bind:value={search} label="Filter hosts" placeholder="Filter by name or IP" />
+		{/if}
+		{#if enabled.length === 0 && disabled.length === 0}
+			<EmptyState title="No matching hosts" description="Try another name or address." />
+		{/if}
+		{#if enabled.length}
+			<Section title={disabled.length ? 'Enabled' : undefined}>{@render hostRows(enabled)}</Section>
+		{/if}
+		{#if disabled.length}
+			<Section
+				title="Disabled"
+				footnote="Disabled hosts can't be requested or offered. Re-enable one from its page."
+			>
+				{@render hostRows(disabled)}
+			</Section>
+		{/if}
+	</div>
+{/if}
 
 <Confirm bind:open title="Add host" description="Lor scans its ed25519 host key right away.">
 	<form
-		class="space-y-4"
+		class="space-y-5"
 		id="add-host"
 		onsubmit={(e) => {
 			e.preventDefault();
 			add();
 		}}
 	>
-		<div class="space-y-2">
-			<Label for="h-name">Name</Label>
+		<Field
+			label="Name"
+			for="h-name"
+			hint="Lowercase letters, digits and dashes. It becomes the certificate principal."
+		>
 			<Input
 				id="h-name"
 				bind:value={name}
@@ -116,12 +165,12 @@
 				autocomplete="off"
 				required
 			/>
-			<p class="text-sm text-muted-foreground">
-				Lowercase letters, digits and dashes. It becomes the certificate principal.
-			</p>
-		</div>
-		<div class="space-y-2">
-			<Label for="h-addr">LAN IP</Label>
+		</Field>
+		<Field
+			label="LAN IP"
+			for="h-addr"
+			hint="An IP, not a name, so traffic always stays on the LAN."
+		>
 			<Input
 				id="h-addr"
 				bind:value={address}
@@ -130,34 +179,44 @@
 				autocomplete="off"
 				required
 			/>
-			<p class="text-sm text-muted-foreground">
-				An IP, not a name, so traffic always stays on the LAN.
-			</p>
+		</Field>
+		<div class="space-y-2">
+			<p class="text-sm font-medium" aria-hidden="true">Most access allowed</p>
+			<SegmentedControl
+				label="Most access allowed"
+				fill
+				bind:value={maxLevel}
+				options={[
+					{ value: 'sudo', label: 'sudo' },
+					{ value: 'user', label: 'Standard user only' }
+				]}
+			/>
 		</div>
-		<fieldset class="space-y-2">
-			<legend class="mb-1 text-sm font-medium">Most access allowed</legend>
-			<label class="flex items-center gap-2"
-				><input type="radio" bind:group={maxLevel} value="sudo" class="size-4 accent-primary" /> sudo</label
+		<ul class="divide-y divide-separator overflow-hidden rounded-xl bg-card">
+			<SettingsRow
+				title="Hypervisor"
+				description="A Proxmox host: sudo controls every guest."
+				icon={Layers}
+				tone="warning"
+				for="h-hypervisor"
 			>
-			<label class="flex items-center gap-2"
-				><input type="radio" bind:group={maxLevel} value="user" class="size-4 accent-primary" /> standard
-				user only</label
+				{#snippet control()}<Switch id="h-hypervisor" bind:checked={hypervisor} />{/snippet}
+			</SettingsRow>
+			<SettingsRow
+				title="Lor infrastructure"
+				description="Runs Lor, or the Caddy proxy in front of it."
+				icon={ShieldAlert}
+				tone="danger"
+				for="h-infra"
 			>
-		</fieldset>
-		<label class="flex items-start gap-3"
-			><Checkbox bind:checked={hypervisor} class="mt-0.5" /><span>Hypervisor (Proxmox host)</span
-			></label
-		>
-		<label class="flex items-start gap-3"
-			><Checkbox bind:checked={lorInfra} class="mt-0.5" /><span
-				>Lor infrastructure (runs Lor, or the Caddy proxy)</span
-			></label
-		>
+				{#snippet control()}<Switch id="h-infra" bind:checked={lorInfra} />{/snippet}
+			</SettingsRow>
+		</ul>
 	</form>
 	{#snippet footer()}
 		<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
 		<Button type="submit" form="add-host" disabled={busy || !name || !address}
-			>{busy ? 'Adding…' : 'Add host'}</Button
+			>{#if busy}<Spinner />{/if}{busy ? 'Adding…' : 'Add host'}</Button
 		>
 	{/snippet}
 </Confirm>

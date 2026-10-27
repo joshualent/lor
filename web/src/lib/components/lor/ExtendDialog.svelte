@@ -1,13 +1,16 @@
 <script lang="ts">
 	import KeyRound from '@lucide/svelte/icons/key-round';
+	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { EXTEND_CHOICES, parseDuration } from '#lib/durations.js';
 	import { errorMessage, isCancel } from '#lib/errors.js';
 	import { clock } from '#lib/clock.svelte.js';
 	import { formatClock, formatDuration } from '#lib/format.js';
 	import { stepUp } from '#lib/webauthn.js';
+	import ChipGroup from './ChipGroup.svelte';
 	import Confirm from './Confirm.svelte';
 
 	let {
@@ -25,6 +28,13 @@
 	const chosen = $derived(custom.trim() ? parseDuration(custom) : seconds);
 	// Added time counts from the current end, not from now.
 	const newEnd = $derived(chosen ? Date.parse(end) + chosen * 1000 : null);
+	const options = $derived(
+		EXTEND_CHOICES.map((c) => ({
+			value: c.seconds,
+			label: c.label,
+			selected: !custom.trim() && seconds === c.seconds
+		}))
+	);
 
 	async function extend() {
 		if (!chosen) return;
@@ -49,38 +59,36 @@
 	description="Added time counts from the current end."
 >
 	<div class="space-y-4">
-		<div class="flex flex-wrap gap-2">
-			{#each EXTEND_CHOICES as c (c.seconds)}
-				<button
-					type="button"
-					class="h-10 rounded-md border px-3 text-sm {!custom.trim() && seconds === c.seconds
-						? 'border-primary bg-primary/10 text-primary'
-						: 'border-border hover:bg-secondary'}"
-					onclick={() => {
-						seconds = c.seconds;
-						custom = '';
-					}}>{c.label}</button
-				>
-			{/each}
-		</div>
+		<ChipGroup
+			{options}
+			value={seconds}
+			label="Add time"
+			onchange={(s) => {
+				seconds = s;
+				custom = '';
+			}}
+		/>
 		<Input
 			bind:value={custom}
 			placeholder="Custom, e.g. 90m or 2d"
 			aria-label="Custom extension"
 			class="max-w-56"
 		/>
-		<p class="text-sm text-muted-foreground">
+		<div class="flex items-center gap-2 rounded-lg bg-card px-3 py-2.5 text-callout">
 			{#if newEnd}
-				Ends {formatClock(Date.parse(end), clock.now)} → would end {formatClock(newEnd, clock.now)}
+				<span class="text-muted-foreground">Ends {formatClock(Date.parse(end), clock.now)}</span>
+				<ArrowRight class="size-4 text-icon-muted" aria-hidden="true" />
+				<span class="font-medium text-primary">{formatClock(newEnd, clock.now)}</span>
 			{:else}
-				Use minutes, hours, days or weeks, like 90m or 2d.
+				<span class="text-muted-foreground">Use minutes, hours, days or weeks, like 90m or 2d.</span
+				>
 			{/if}
-		</p>
+		</div>
 	</div>
 	{#snippet footer()}
 		<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
 		<Button disabled={!chosen || busy} onclick={extend}>
-			<KeyRound />
+			{#if busy}<Spinner />{:else}<KeyRound />{/if}
 			{busy ? 'Waiting for passkey…' : `Extend by ${chosen ? formatDuration(chosen) : '…'}`}
 		</Button>
 	{/snippet}

@@ -3,13 +3,17 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
-	import { keys, fetchSession } from '#lib/queries.js';
+	import { dev } from '$app/env';
+	import { keys, fetchDashboard, fetchSession } from '#lib/queries.js';
 	import { api, call } from '#lib/api/client.js';
+	import EmptyState from './EmptyState.svelte';
+	import CloudOff from '@lucide/svelte/icons/cloud-off';
 
 	let { children }: { children: Snippet } = $props();
 	const qc = useQueryClient();
 
-	const PUBLIC = ['/login', '/setup'];
+	// The component gallery needs no data; it only exists in dev builds.
+	const PUBLIC = dev ? ['/login', '/setup', '/gallery'] : ['/login', '/setup'];
 	const isPublic = $derived(PUBLIC.includes(page.url.pathname));
 
 	const session = createQuery(() => ({
@@ -30,6 +34,18 @@
 			goto(`/login?next=${encodeURIComponent(path + page.url.search)}`, { replaceState: true });
 		}
 	});
+
+	// Pending decisions, as a badge on Home (shares the dashboard's cache;
+	// the dashboard itself polls faster while it's open).
+	const dash = createQuery(() => ({
+		queryKey: keys.dashboard,
+		queryFn: fetchDashboard,
+		refetchInterval: 30_000,
+		enabled: session.data?.authenticated === true
+	}));
+	const pending = $derived(
+		(dash.data?.pending_requests.length ?? 0) + (dash.data?.pending_extensions.length ?? 0)
+	);
 
 	const nav = [
 		{ href: '/', label: 'Home' },
@@ -54,36 +70,60 @@
 	const ready = $derived(isPublic || session.data?.authenticated === true);
 </script>
 
-<div class="mx-auto flex min-h-dvh max-w-3xl flex-col px-4 sm:px-6">
+<div class="flex min-h-dvh flex-col">
 	{#if !isPublic && session.data?.authenticated}
-		<header class="flex items-center gap-4 pt-4 pb-2 sm:pt-6">
-			<a href="/" class="text-lg font-semibold tracking-tight no-underline!" aria-label="Lor home"
-				>Lor</a
+		<header
+			class="sticky top-0 z-30 border-b border-transparent bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/70"
+		>
+			<div
+				class="mx-auto flex max-w-3xl items-center gap-3 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2.5 sm:gap-4 sm:px-6 sm:pt-5"
 			>
-			<nav class="-mx-1 no-scrollbar flex flex-1 gap-1 overflow-x-auto" aria-label="Main">
-				{#each nav as n (n.href)}
-					<a
-						href={n.href}
-						class="rounded-md px-2.5 py-1.5 text-sm whitespace-nowrap no-underline! {active(n.href)
-							? 'bg-secondary text-foreground'
-							: 'text-muted-foreground hover:text-foreground'}"
-						aria-current={active(n.href) ? 'page' : undefined}>{n.label}</a
-					>
-				{/each}
-			</nav>
-			<button
-				class="hidden text-sm text-muted-foreground hover:text-foreground sm:block"
-				onclick={signOut}
-			>
-				Sign out
-			</button>
+				<a
+					href="/"
+					class="rounded-md text-lg font-semibold tracking-tight no-underline! focus-ring"
+					aria-label="Lor home">Lor</a
+				>
+				<nav
+					class="-mx-1 no-scrollbar flex flex-1 gap-0.5 overflow-x-auto sm:gap-1"
+					aria-label="Main"
+				>
+					{#each nav as n (n.href)}
+						<a
+							href={n.href}
+							class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm whitespace-nowrap no-underline! focus-ring transition-colors {active(
+								n.href
+							)
+								? 'bg-secondary text-foreground'
+								: 'text-muted-foreground hover:text-foreground'}"
+							aria-current={active(n.href) ? 'page' : undefined}
+							>{n.label}{#if n.href === '/' && pending > 0}<span
+									class="grid h-4 min-w-4 place-items-center rounded-full bg-warning px-1 text-[0.6875rem] leading-none font-semibold text-primary-foreground nums"
+									aria-label="{pending} waiting">{pending}</span
+								>{/if}</a
+						>
+					{/each}
+				</nav>
+				<button
+					class="hidden rounded-md text-sm text-muted-foreground focus-ring transition-colors hover:text-foreground sm:block"
+					onclick={signOut}
+				>
+					Sign out
+				</button>
+			</div>
 		</header>
 	{/if}
-	<main class="flex-1 pt-4 pb-16">
+	<main class="mx-auto w-full max-w-3xl flex-1 px-4 pt-4 pb-16 sm:px-6 sm:pt-6">
 		{#if ready}
 			{@render children()}
 		{:else if session.isError}
-			<p class="mt-16 text-center text-destructive">Can't reach Lor. Retrying…</p>
+			<EmptyState
+				icon={CloudOff}
+				tone="danger"
+				variant="page"
+				title="Can't reach Lor"
+				description="Retrying automatically. Check that the server is running and your connection is up."
+				role="alert"
+			/>
 		{/if}
 	</main>
 </div>

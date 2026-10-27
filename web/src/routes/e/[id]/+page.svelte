@@ -1,5 +1,7 @@
 <script lang="ts">
 	import KeyRound from '@lucide/svelte/icons/key-round';
+	import ArrowRight from '@lucide/svelte/icons/arrow-right';
+	import TimerReset from '@lucide/svelte/icons/timer-reset';
 	import { page } from '$app/state';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
@@ -8,15 +10,25 @@
 	import { errorMessage, isCancel } from '#lib/errors.js';
 	import { formatAgo, formatClock, formatCountdown, formatDuration } from '#lib/format.js';
 	import { keys, fetchExtension, LIVE_MS } from '#lib/queries.js';
+	import { passkeyName } from '#lib/status.js';
 	import { stepUp } from '#lib/webauthn.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import ActionBar from '#lib/components/lor/ActionBar.svelte';
+	import Card from '#lib/components/lor/Card.svelte';
 	import Confirm from '#lib/components/lor/Confirm.svelte';
+	import DescriptionItem from '#lib/components/lor/DescriptionItem.svelte';
+	import DescriptionList from '#lib/components/lor/DescriptionList.svelte';
 	import DurationPicker from '#lib/components/lor/DurationPicker.svelte';
-	import Row from '#lib/components/lor/Row.svelte';
+	import ErrorState from '#lib/components/lor/ErrorState.svelte';
+	import IconTile from '#lib/components/lor/IconTile.svelte';
+	import LevelBadge from '#lib/components/lor/LevelBadge.svelte';
+	import PageHeader from '#lib/components/lor/PageHeader.svelte';
+	import PageSkeleton from '#lib/components/lor/PageSkeleton.svelte';
 	import Section from '#lib/components/lor/Section.svelte';
-	import Status from '#lib/components/lor/Status.svelte';
+	import StatusBadge from '#lib/components/lor/StatusBadge.svelte';
 	import UnverifiedText from '#lib/components/lor/UnverifiedText.svelte';
 	import Warnings from '#lib/components/lor/Warnings.svelte';
 
@@ -92,49 +104,69 @@
 </script>
 
 {#if q.isPending}
-	<p class="text-muted-foreground">Loading…</p>
+	<PageSkeleton />
 {:else if q.isError}
-	<p class="text-destructive">{errorMessage(q.error)}</p>
+	<ErrorState error={q.error} onretry={() => q.refetch()} back={{ href: '/', label: 'Home' }} />
 {:else if d}
 	{@const g = d.grant}
-	<article class="space-y-6">
-		<header>
-			<h1 class="text-2xl leading-tight">
-				<span class="font-normal text-muted-foreground">{g.agent.name} wants more time on</span>
-				{g.host.name}
-			</h1>
-			<p class="mt-1 text-sm text-muted-foreground">
-				Extension #{d.extension.id} of <a href="/grants/{g.id}">grant #{g.id}</a> ·
-				{formatAgo(Date.parse(d.extension.requested_at), clock.now)}
-			</p>
-		</header>
+	<article class="space-y-7" data-testid="extension">
+		<PageHeader
+			title="{g.agent.name} wants more time on {g.host.name}"
+			back={{ href: '/', label: 'Home' }}
+		>
+			{#snippet leading()}<IconTile icon={TimerReset} tone="warning" size="lg" />{/snippet}
+			{#snippet heading()}
+				<span class="block text-callout font-normal tracking-normal text-muted-foreground"
+					>{g.agent.name} wants more time on</span
+				>{g.host.name}
+			{/snippet}
+			{#snippet meta()}
+				<StatusBadge status={d.extension.status} kind="extension" />
+				<LevelBadge level={g.level} />
+				<span class="text-footnote text-muted-foreground">
+					Extension #{d.extension.id} of <a href="/grants/{g.id}">grant #{g.id}</a> ·
+					{formatAgo(Date.parse(d.extension.requested_at), clock.now)}
+				</span>
+			{/snippet}
+		</PageHeader>
 
 		{#if d.actions.approve}
 			<Warnings warnings={g.warnings} level={g.level} />
 
-			<Section>
-				<dl>
-					<Row label="Level"
-						>{g.level === 'sudo' ? 'sudo (root), unchanged' : 'standard user, unchanged'}</Row
-					>
-					<Row label="Now"
-						>ends {formatClock(end, clock.now)} ({formatCountdown(end, clock.now)} left)</Row
-					>
-					<Row label="If approved"
-						><span class="text-primary">would end {formatClock(would, clock.now)}</span></Row
-					>
-				</dl>
-			</Section>
-
-			<Section title="Add">
-				<DurationPicker bind:value={duration} bind:valid={durationValid} id="ext-duration" />
-			</Section>
-
 			<UnverifiedText text={d.extension.reason} />
 
-			<div
-				class="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t bg-background/95 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur sm:static sm:mx-0 sm:flex-row sm:border-0 sm:px-0"
-			>
+			<Section title="Time">
+				<Card>
+					<div class="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="extension-times">
+						<div>
+							<p class="text-footnote text-muted-foreground">Now ends</p>
+							<p class="text-headline nums">{formatClock(end, clock.now)}</p>
+							<p class="text-footnote text-muted-foreground">
+								{formatCountdown(end, clock.now)} left
+							</p>
+						</div>
+						<ArrowRight class="mx-1 size-5 text-icon-muted" aria-label="would become" />
+						<div>
+							<p class="text-footnote text-muted-foreground">If approved</p>
+							<p class="text-headline text-primary nums">{formatClock(would, clock.now)}</p>
+							<p class="text-footnote text-muted-foreground">+{formatDuration(duration)}</p>
+						</div>
+					</div>
+					<div class="mt-4 border-t border-separator pt-4">
+						<p class="mb-3 text-callout text-muted-foreground">
+							Add (the level stays {g.level === 'sudo' ? 'sudo' : 'standard user'})
+						</p>
+						<DurationPicker
+							bind:value={duration}
+							bind:valid={durationValid}
+							id="ext-duration"
+							label="Add"
+						/>
+					</div>
+				</Card>
+			</Section>
+
+			<ActionBar>
 				<Button
 					size="lg"
 					class="sm:flex-1"
@@ -142,26 +174,34 @@
 					onclick={approve}
 					data-testid="approve-extension"
 				>
-					<KeyRound />
+					{#if busy}<Spinner />{:else}<KeyRound />{/if}
 					{busy ? 'Waiting for passkey…' : `Extend ${g.host.name} by ${formatDuration(duration)}`}
 				</Button>
 				<Button size="lg" variant="outline" disabled={busy} onclick={() => (denyOpen = true)}
 					>Deny</Button
 				>
-			</div>
+			</ActionBar>
 		{:else}
-			<Section>
-				<dl>
-					<Row label="Status"><Status status={d.extension.status} /></Row>
-					<Row label="Asked for">+{formatDuration(d.extension.requested_duration_s)}</Row>
-					{#if d.extension.approved_duration_s}<Row label="Approved"
-							>+{formatDuration(d.extension.approved_duration_s)}</Row
-						>{/if}
-					{#if d.extension.decision_note}<Row label="Note">{d.extension.decision_note}</Row>{/if}
-					<Row label="Grant"
-						><a href="/grants/{g.id}">#{g.id}</a> · <Status status={g.status} /></Row
+			<Section title="Outcome">
+				<DescriptionList>
+					<DescriptionItem label="Asked for"
+						>+{formatDuration(d.extension.requested_duration_s)}</DescriptionItem
 					>
-				</dl>
+					{#if d.extension.approved_duration_s}<DescriptionItem label="Approved"
+							>+{formatDuration(d.extension.approved_duration_s)}</DescriptionItem
+						>{/if}
+					{#if d.extension.decided_by}<DescriptionItem label="Decided by"
+							>{passkeyName(d.extension.decided_by)}</DescriptionItem
+						>{/if}
+					{#if d.extension.decision_note}<DescriptionItem label="Note" layout="stacked"
+							>{d.extension.decision_note}</DescriptionItem
+						>{/if}
+					<DescriptionItem label="Grant">
+						<a href="/grants/{g.id}" class="inline-flex items-center gap-2"
+							>#{g.id} <StatusBadge status={g.status} /></a
+						>
+					</DescriptionItem>
+				</DescriptionList>
 			</Section>
 			<UnverifiedText text={d.extension.reason} />
 		{/if}

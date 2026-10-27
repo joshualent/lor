@@ -1,18 +1,33 @@
 <script lang="ts">
+	import ScrollText from '@lucide/svelte/icons/scroll-text';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
-	import { errorMessage } from '#lib/errors.js';
-	import { formatTimestamp } from '#lib/format.js';
+	import { clock } from '#lib/clock.svelte.js';
+	import { ACTOR_FILTERS, CATEGORY_FILTERS, groupByDay } from '#lib/audit.js';
 	import { keys, fetchAudit, type AuditEvent } from '#lib/queries.js';
+	import { useNames } from '#lib/names.svelte.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { Input } from '#lib/components/ui/input/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import AuditEventRow from '#lib/components/lor/AuditEventRow.svelte';
+	import ChipGroup from '#lib/components/lor/ChipGroup.svelte';
+	import EmptyState from '#lib/components/lor/EmptyState.svelte';
+	import ErrorState from '#lib/components/lor/ErrorState.svelte';
+	import List from '#lib/components/lor/List.svelte';
+	import ListSkeleton from '#lib/components/lor/ListSkeleton.svelte';
 	import PageHeader from '#lib/components/lor/PageHeader.svelte';
+	import SearchField from '#lib/components/lor/SearchField.svelte';
 	import Section from '#lib/components/lor/Section.svelte';
+	import SegmentedControl from '#lib/components/lor/SegmentedControl.svelte';
+	import Toolbar from '#lib/components/lor/Toolbar.svelte';
+
+	const PAGE = 100;
 
 	let actor = $state(page.url.searchParams.get('actor') ?? '');
 	let action = $state(page.url.searchParams.get('action') ?? '');
 	let grant = $state(page.url.searchParams.get('grant_id') ?? '');
 	let older = $state<AuditEvent[]>([]);
+	let olderDone = $state(false);
 	let loadingMore = $state(false);
 
 	const filter = $derived({
@@ -28,73 +43,120 @@
 	$effect(() => {
 		void filter;
 		older = [];
+		olderDone = false;
 	});
 
+	// Keep the filters in the URL, so a filtered log can be shared or reloaded.
+	$effect(() => {
+		const parts = Object.entries(filter)
+			.filter(([, v]) => v !== undefined)
+			.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`);
+		const search = parts.length ? `?${parts.join('&')}` : '';
+		if (search !== window.location.search) {
+			goto(`${window.location.pathname}${search}`, { replace: true, shallow: true });
+		}
+	});
+
+	const names = useNames();
+
 	const events = $derived([...(q.data ?? []), ...older]);
+	const groups = $derived(groupByDay(events, clock.now));
+	const hasMore = $derived(
+		!olderDone && (older.length ? older.length % PAGE === 0 : (q.data?.length ?? 0) >= PAGE)
+	);
+	const filtered = $derived(!!(filter.actor || filter.action || filter.grant_id));
+
+	// The category chips, plus the current prefix if it came from a link.
+	const categories = $derived(
+		CATEGORY_FILTERS.some((c) => c.prefix === action)
+			? CATEGORY_FILTERS
+			: [...CATEGORY_FILTERS, { label: action, prefix: action }]
+	);
 
 	async function more() {
 		const last = events.at(-1);
 		if (!last) return;
 		loadingMore = true;
 		try {
-			older = [...older, ...(await fetchAudit({ ...filter, before: last.id }))];
+			const next = await fetchAudit({ ...filter, before: last.id });
+			if (next.length < PAGE) olderDone = true;
+			older = [...older, ...next];
 		} finally {
 			loadingMore = false;
 		}
 	}
 
-	function details(d: Record<string, unknown>): string {
-		const parts = Object.entries(d).filter(([, v]) => v !== '' && v !== null && v !== undefined);
-		return parts
-			.map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
-			.join(' ');
+	function clear() {
+		actor = '';
+		action = '';
+		grant = '';
 	}
 </script>
 
-<PageHeader title="Audit log" subtitle="Append-only. Newest first." />
+<PageHeader
+	title="Audit log"
+	subtitle="Everything Lor did and who asked. Append-only, newest first."
+/>
 
-<div class="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-	<select
+<Toolbar label="Filters">
+	<SegmentedControl
+		label="Who"
 		bind:value={actor}
-		class="h-10 rounded-md border border-input bg-background px-3"
-		aria-label="Actor"
-	>
-		<option value="">Everyone</option>
-		<option value="admin:">Admin</option>
-		<option value="agent:">Agents</option>
-		<option value="system">System</option>
-	</select>
-	<Input bind:value={action} placeholder="Action, e.g. grant." aria-label="Action prefix" />
-	<Input bind:value={grant} placeholder="Grant #" inputmode="numeric" aria-label="Grant ID" />
-</div>
+		options={ACTOR_FILTERS.map((f) => ({ value: f.value, label: f.label }))}
+		class="w-full sm:w-auto"
+		fill
+	/>
+	<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+		<ChipGroup
+			label="Category"
+			scroll
+			bind:value={action}
+			options={categories.map((c) => ({ value: c.prefix, label: c.label }))}
+			class="sm:flex-1"
+		/>
+		<SearchField
+			bind:value={grant}
+			label="Grant number"
+			placeholder="Grant #"
+			inputmode="numeric"
+			class="sm:w-36"
+		/>
+	</div>
+</Toolbar>
 
-<Section>
-	{#if q.isPending}
-		<p class="text-muted-foreground">Loading…</p>
-	{:else if q.isError}
-		<p class="text-destructive">{errorMessage(q.error)}</p>
-	{:else if events.length === 0}
-		<p class="text-muted-foreground">No matching events.</p>
-	{:else}
-		<ol class="-my-2 divide-y divide-border text-sm">
-			{#each events as ev (ev.id)}
-				<li class="py-2.5">
-					<p>
-						<span class="font-medium">{ev.action}</span>
-						<span class="text-muted-foreground">· {ev.actor}</span>
-						{#if ev.grant_id}· <a href="/grants/{ev.grant_id}">grant #{ev.grant_id}</a>{/if}
-					</p>
-					<p class="text-muted-foreground tabular-nums">{formatTimestamp(Date.parse(ev.ts))}</p>
-					{#if Object.keys(ev.details).length}
-						<p class="mt-0.5 font-mono text-xs break-all text-muted-foreground">
-							{details(ev.details)}
-						</p>
-					{/if}
-				</li>
-			{/each}
-		</ol>
-		{#if (q.data?.length ?? 0) >= 100}
-			<Button variant="ghost" class="mt-3" disabled={loadingMore} onclick={more}>Load older</Button>
+{#if q.isPending}
+	<ListSkeleton rows={8} />
+{:else if q.isError}
+	<ErrorState error={q.error} onretry={() => q.refetch()} variant="inset" />
+{:else if events.length === 0}
+	<EmptyState
+		icon={ScrollText}
+		title={filtered ? 'No matching events' : 'Nothing logged yet'}
+		description={filtered
+			? 'Try another filter, or clear them to see everything.'
+			: 'Requests, approvals, sign-ins and changes are recorded here.'}
+	>
+		{#snippet action()}
+			{#if filtered}<Button variant="secondary" onclick={clear}>Clear filters</Button>{/if}
+		{/snippet}
+	</EmptyState>
+{:else}
+	<div class="space-y-6" data-testid="audit-log">
+		{#each groups as group (group.key)}
+			<Section title={group.label} count={group.events.length}>
+				<List ordered>
+					{#each group.events as ev (ev.id)}
+						<AuditEventRow event={ev} names={names.current} />
+					{/each}
+				</List>
+			</Section>
+		{/each}
+		{#if hasMore}
+			<Button variant="secondary" class="w-full" disabled={loadingMore} onclick={more}>
+				{#if loadingMore}<Spinner />{/if}Load older events
+			</Button>
+		{:else}
+			<p class="text-center text-footnote text-muted-foreground">That's everything.</p>
 		{/if}
-	{/if}
-</Section>
+	</div>
+{/if}

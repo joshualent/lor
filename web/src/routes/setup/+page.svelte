@@ -1,10 +1,14 @@
 <script lang="ts">
+	import KeyRound from '@lucide/svelte/icons/key-round';
 	import { goto } from '$app/navigation';
 	import { useQueryClient } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
-	import { Label } from '#lib/components/ui/label/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
+	import AuthCard from '#lib/components/lor/AuthCard.svelte';
+	import Card from '#lib/components/lor/Card.svelte';
+	import Field from '#lib/components/lor/Field.svelte';
 	import { setupPasskey } from '#lib/webauthn.js';
 	import { errorMessage, isCancel } from '#lib/errors.js';
 	import { keys } from '#lib/queries.js';
@@ -30,31 +34,31 @@
 	}
 </script>
 
-<div class="mx-auto mt-[12vh] max-w-sm">
-	<h1 class="text-2xl">Set up Lor</h1>
-	<p class="mt-2 text-muted-foreground">
-		On the Lor LXC, run <code>lor-server admin setup-code</code>, then enter the code here and
-		register your first passkey.
-	</p>
-	<form class="mt-8 space-y-5" onsubmit={submit}>
-		<div class="space-y-2">
-			<Label for="code">Setup code</Label>
-			<Input
-				id="code"
-				bind:value={code}
-				placeholder="7KQ-M2P-X9D"
-				autocomplete="one-time-code"
-				autocapitalize="characters"
-				required
-			/>
-		</div>
-		<div class="space-y-2">
-			<Label for="name">Passkey name</Label>
-			<Input id="name" bind:value={name} placeholder="iPhone" maxlength={64} required />
-			<p class="text-sm text-muted-foreground">So you can tell your passkeys apart later.</p>
-		</div>
+<AuthCard title="Set up Lor">
+	{#snippet subtitle()}
+		On the Lor LXC, run <code class="text-foreground">lor-server admin setup-code</code>, then enter
+		the code here and register your first passkey.
+	{/snippet}
+	<form onsubmit={submit} class="space-y-4">
+		<Card class="space-y-5">
+			<Field label="Setup code" for="code" hint="Works once, for a short time.">
+				<Input
+					id="code"
+					bind:value={code}
+					placeholder="7KQ-M2P-X9D"
+					autocomplete="one-time-code"
+					autocapitalize="characters"
+					class="font-mono tracking-wider"
+					required
+				/>
+			</Field>
+			<Field label="Passkey name" for="name" hint="So you can tell your passkeys apart later.">
+				<Input id="name" bind:value={name} placeholder="iPhone" maxlength={64} required />
+			</Field>
+		</Card>
 		<Button type="submit" size="lg" class="w-full" disabled={busy || !code || !name}>
+			{#if busy}<Spinner />{:else}<KeyRound />{/if}
 			{busy ? 'Waiting for passkey…' : 'Register passkey'}
 		</Button>
 	</form>
-</div>
+</AuthCard>

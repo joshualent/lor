@@ -1,6 +1,9 @@
 <script lang="ts">
 	import Plus from '@lucide/svelte/icons/plus';
-	import ChevronRight from '@lucide/svelte/icons/chevron-right';
+	import Inbox from '@lucide/svelte/icons/inbox';
+	import TimerReset from '@lucide/svelte/icons/timer-reset';
+	import Clock from '@lucide/svelte/icons/clock';
+	import ShieldCheck from '@lucide/svelte/icons/shield-check';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
 	import { api, call } from '#lib/api/client.js';
@@ -8,12 +11,23 @@
 	import { errorMessage } from '#lib/errors.js';
 	import { formatAgo, formatArgv, formatCountdown, formatDuration } from '#lib/format.js';
 	import { keys, fetchDashboard, LIVE_MS, type Summary } from '#lib/queries.js';
+	import { hostLook } from '#lib/status.js';
+	import { useNames } from '#lib/names.svelte.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import AuditEventRow from '#lib/components/lor/AuditEventRow.svelte';
 	import Confirm from '#lib/components/lor/Confirm.svelte';
 	import Countdown from '#lib/components/lor/Countdown.svelte';
+	import EmptyState from '#lib/components/lor/EmptyState.svelte';
+	import ErrorState from '#lib/components/lor/ErrorState.svelte';
 	import ExtendDialog from '#lib/components/lor/ExtendDialog.svelte';
+	import IconTile from '#lib/components/lor/IconTile.svelte';
+	import LevelBadge from '#lib/components/lor/LevelBadge.svelte';
+	import List from '#lib/components/lor/List.svelte';
+	import ListRow from '#lib/components/lor/ListRow.svelte';
+	import PageHeader from '#lib/components/lor/PageHeader.svelte';
+	import PageSkeleton from '#lib/components/lor/PageSkeleton.svelte';
 	import Section from '#lib/components/lor/Section.svelte';
-	import { actionLabel } from '#lib/labels.js';
+	import StatusBadge from '#lib/components/lor/StatusBadge.svelte';
 
 	const qc = useQueryClient();
 	const q = createQuery(() => ({
@@ -22,6 +36,7 @@
 		refetchInterval: LIVE_MS
 	}));
 	const d = $derived(q.data);
+	const names = useNames();
 
 	let extendFor = $state<Summary | null>(null);
 	let extendOpen = $state(false);
@@ -51,148 +66,173 @@
 		refresh();
 	}
 
-	const level = (l: string) => (l === 'sudo' ? 'sudo' : 'user');
 	const pendingCount = $derived(
 		(d?.pending_requests.length ?? 0) + (d?.pending_extensions.length ?? 0)
 	);
+	const open = $derived(d ? [...d.active, ...d.offered] : []);
+	const summary = $derived.by(() => {
+		if (!d) return undefined;
+		const parts = [];
+		if (pendingCount) parts.push(`${pendingCount} waiting for you`);
+		if (d.active.length) parts.push(`${d.active.length} active`);
+		if (d.offered.length) parts.push(`${d.offered.length} offered`);
+		return parts.length ? parts.join(' · ') : 'Nothing needs you right now.';
+	});
 </script>
 
-<div class="mb-6 flex items-center justify-between gap-3">
-	<h1 class="text-2xl">Home</h1>
-	<Button href="/grants/new"><Plus /> Grant access</Button>
-</div>
+<PageHeader title="Home" subtitle={summary}>
+	{#snippet actions()}<Button href="/grants/new"><Plus /> Grant access</Button>{/snippet}
+</PageHeader>
+
+{#snippet grantActions(g: Summary, cls: string)}
+	<div class={cls}>
+		<Button
+			size="sm"
+			variant="secondary"
+			onclick={() => {
+				extendFor = g;
+				extendOpen = true;
+			}}>Extend</Button
+		>
+		<Button
+			size="sm"
+			variant="ghost"
+			class="text-destructive hover:text-destructive"
+			onclick={() => {
+				revokeFor = g;
+				revokeOpen = true;
+			}}>{g.status === 'offered' ? 'Withdraw' : 'Revoke'}</Button
+		>
+	</div>
+{/snippet}
 
 {#if q.isPending}
-	<p class="text-muted-foreground">Loading…</p>
+	<PageSkeleton header={false} sections={3} />
 {:else if q.isError}
-	<p class="text-destructive">{errorMessage(q.error)}</p>
+	<ErrorState error={q.error} onretry={() => q.refetch()} />
 {:else if d}
-	<div class="space-y-6">
+	<div class="space-y-8">
 		{#if pendingCount > 0}
-			<Section title="Waiting for you">
-				<ul class="-my-2 divide-y divide-border">
+			<Section title="Waiting for you" count={pendingCount}>
+				<List data-testid="pending">
 					{#each d.pending_requests as g (g.id)}
-						<li>
-							<a href="/r/{g.id}" class="group flex items-center gap-3 py-3 no-underline!">
-								<div class="min-w-0 flex-1">
-									<p>
-										<span class="font-medium">{g.agent.name}</span>
-										<span class="text-muted-foreground">wants</span>
-										<span class={g.requested_level === 'sudo' ? 'text-warning' : ''}
-											>{level(g.requested_level)}</span
-										>
-										<span class="text-muted-foreground">on</span>
-										<span class="font-medium">{g.host.name}</span>
-										<span class="text-muted-foreground"
-											>· {formatDuration(g.requested_duration_s ?? 0)}</span
-										>
-									</p>
-									<p class="line-clamp-2 text-sm break-words text-muted-foreground">{g.reason}</p>
-									{#if g.approval_deadline}
-										<p class="text-xs text-muted-foreground">
-											approve within {formatCountdown(Date.parse(g.approval_deadline), clock.now)}
-										</p>
-									{/if}
-								</div>
-								<ChevronRight class="size-4 shrink-0 text-muted-foreground" />
-							</a>
-						</li>
+						<ListRow href="/r/{g.id}" density="relaxed">
+							{#snippet leading()}<IconTile icon={Inbox} tone="warning" />{/snippet}
+							{#snippet titleContent()}
+								<span class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+									<span>{g.agent.name}</span>
+									<span class="font-normal text-muted-foreground">wants</span>
+									<LevelBadge level={g.requested_level} short />
+									<span class="font-normal text-muted-foreground">on</span>
+									<span>{g.host.name}</span>
+								</span>
+							{/snippet}
+							{#snippet subtitleContent()}
+								<span class="line-clamp-2">{g.reason}</span>
+								<span class="mt-1 flex items-center gap-1.5 text-footnote">
+									<Clock class="size-3.5 shrink-0" aria-hidden="true" />
+									{[
+										`for ${formatDuration(g.requested_duration_s ?? 0)}`,
+										g.approval_deadline
+											? `${formatCountdown(Date.parse(g.approval_deadline), clock.now)} to decide`
+											: undefined
+									]
+										.filter(Boolean)
+										.join(' · ')}
+								</span>
+							{/snippet}
+						</ListRow>
 					{/each}
 					{#each d.pending_extensions as x (x.extension.id)}
-						<li>
-							<a href="/e/{x.extension.id}" class="flex items-center gap-3 py-3 no-underline!">
-								<div class="min-w-0 flex-1">
-									<p>
-										<span class="font-medium">{x.grant.agent.name}</span>
-										<span class="text-muted-foreground">wants</span>
-										+{formatDuration(x.extension.requested_duration_s)}
-										<span class="text-muted-foreground">on</span>
-										<span class="font-medium">{x.grant.host.name}</span>
-									</p>
-									<p class="line-clamp-2 text-sm break-words text-muted-foreground">
-										{x.extension.reason}
-									</p>
-								</div>
-								<ChevronRight class="size-4 shrink-0 text-muted-foreground" />
-							</a>
-						</li>
+						<ListRow href="/e/{x.extension.id}" density="relaxed">
+							{#snippet leading()}<IconTile icon={TimerReset} tone="warning" />{/snippet}
+							{#snippet titleContent()}
+								{x.grant.agent.name}
+								<span class="font-normal text-muted-foreground">wants more time on</span>
+								{x.grant.host.name}
+							{/snippet}
+							{#snippet subtitleContent()}
+								<span class="line-clamp-2">{x.extension.reason}</span>
+								<span class="mt-1 flex items-center gap-1.5 text-footnote">
+									<Clock class="size-3.5 shrink-0" aria-hidden="true" />
+									+{formatDuration(x.extension.requested_duration_s)}
+								</span>
+							{/snippet}
+						</ListRow>
 					{/each}
-				</ul>
+				</List>
 			</Section>
 		{/if}
 
-		<Section title="Active">
-			{#if d.active.length === 0 && d.offered.length === 0}
-				<p class="text-muted-foreground">No agent has access right now.</p>
+		<Section title="Access" count={open.length || undefined}>
+			{#if open.length === 0}
+				<EmptyState
+					icon={ShieldCheck}
+					title="No agent has access"
+					description="Access starts when you approve a request or grant it ahead of time."
+				>
+					{#snippet action()}
+						<Button variant="secondary" href="/grants/new"><Plus /> Grant access</Button>
+					{/snippet}
+				</EmptyState>
 			{:else}
-				<ul class="-my-2 divide-y divide-border">
-					{#each [...d.active, ...d.offered] as g (g.id)}
-						<li class="py-3">
-							<div class="flex items-start gap-3">
-								<a href="/grants/{g.id}" class="min-w-0 flex-1 no-underline!">
-									<p>
-										<span class="font-medium">{g.host.name}</span>
-										<span class="text-muted-foreground">· {g.agent.name} ·</span>
-										<span class={g.level === 'sudo' ? 'text-warning' : ''}>{level(g.level)}</span>
-										{#if g.status === 'offered'}<span class="text-muted-foreground"
-												>· offered, not claimed yet</span
-											>{/if}
-									</p>
-									<p class="text-sm text-muted-foreground"><Countdown end={g.valid_before} /></p>
-									{#if g.last_command}
-										<p class="mt-1 truncate text-sm text-muted-foreground">
-											<code>{formatArgv(g.last_command.argv)}</code>
-											· {formatAgo(Date.parse(g.last_command.reported_at), clock.now)}
-										</p>
-									{/if}
-								</a>
-								<div class="flex shrink-0 gap-1">
-									<Button
-										size="sm"
-										variant="secondary"
-										onclick={() => {
-											extendFor = g;
-											extendOpen = true;
-										}}>Extend</Button
-									>
-									<Button
-										size="sm"
-										variant="ghost"
-										class="text-destructive"
-										onclick={() => {
-											revokeFor = g;
-											revokeOpen = true;
-										}}>{g.status === 'offered' ? 'Withdraw' : 'Revoke'}</Button
-									>
-								</div>
-							</div>
-						</li>
+				<List data-testid="open-grants">
+					{#each open as g (g.id)}
+						{@const look = hostLook(g.host)}
+						<ListRow href="/grants/{g.id}" label="{g.host.name}, {g.agent.name}">
+							{#snippet leading()}<IconTile icon={look.icon} tone={look.tone} />{/snippet}
+							{#snippet titleContent()}
+								<span class="flex flex-wrap items-center gap-x-2 gap-y-1">
+									{g.host.name}
+									{#if g.level === 'sudo'}<LevelBadge level="sudo" short />{/if}
+								</span>
+							{/snippet}
+							{#snippet subtitleContent()}
+								<span class="block"
+									>{g.agent.name}{g.status === 'offered' ? ' · not claimed yet' : ''}</span
+								>
+								{#if g.last_command}
+									<span class="mt-0.5 flex min-w-0 items-baseline gap-1.5 text-footnote">
+										<code class="truncate text-foreground/80"
+											>{formatArgv(g.last_command.argv)}</code
+										>
+										<span class="shrink-0"
+											>· {formatAgo(Date.parse(g.last_command.reported_at), clock.now)}</span
+										>
+									</span>
+								{/if}
+							{/snippet}
+							{#snippet metaContent()}
+								{#if g.status === 'offered'}<StatusBadge status="offered" />{/if}
+								<Countdown end={g.valid_before} variant="badge" />
+							{/snippet}
+							{#snippet trailing()}
+								{@render grantActions(g, 'hidden gap-1 sm:flex')}
+							{/snippet}
+							{@render grantActions(g, 'flex gap-1 px-4 pb-3 pl-16 sm:hidden')}
+						</ListRow>
 					{/each}
-				</ul>
+				</List>
 			{/if}
 		</Section>
 
 		<Section title="Recent activity">
-			{#snippet actions()}<a href="/audit" class="text-sm text-muted-foreground">All</a>{/snippet}
+			{#snippet action()}
+				<Button variant="ghost" size="sm" href="/audit" class="text-muted-foreground"
+					>View all</Button
+				>
+			{/snippet}
 			{#if d.recent_audit.length === 0}
-				<p class="text-muted-foreground">Nothing yet.</p>
+				<EmptyState
+					title="Nothing yet"
+					description="Requests, approvals and changes show up here."
+				/>
 			{:else}
-				<ol class="space-y-1.5 text-sm">
-					{#each d.recent_audit as ev (ev.id)}
-						<li class="flex gap-3">
-							<span class="w-20 shrink-0 text-muted-foreground tabular-nums"
-								>{formatAgo(Date.parse(ev.ts), clock.now)}</span
-							>
-							<span class="min-w-0 break-words">
-								{actionLabel(ev.action)}
-								<span class="text-muted-foreground">· {ev.actor}</span>
-								{#if ev.grant_id}<a href="/grants/{ev.grant_id}" class="text-muted-foreground"
-										>#{ev.grant_id}</a
-									>{/if}
-							</span>
-						</li>
+				<List ordered label="Recent activity">
+					{#each d.recent_audit.slice(0, 8) as ev (ev.id)}
+						<AuditEventRow event={ev} time="ago" names={names.current} />
 					{/each}
-				</ol>
+				</List>
 			{/if}
 		</Section>
 	</div>

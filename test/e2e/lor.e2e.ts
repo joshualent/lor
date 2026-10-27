@@ -45,12 +45,15 @@ test('first-passkey setup, then login', async () => {
 
 test('add a host and enroll an agent', async () => {
 	await page.goto('/hosts');
+	await expect(page.getByText('No hosts yet')).toBeVisible(); // empty state
 	await page.getByRole('button', { name: 'Add host' }).first().click();
 	await page.getByLabel('Name').fill('nas');
 	await page.getByLabel('LAN IP').fill(state.sshAddr);
-	await page.getByText('Lor infrastructure (runs Lor').click();
+	await page.getByRole('switch', { name: 'Lor infrastructure' }).click();
+	await expect(page.getByRole('switch', { name: 'Lor infrastructure' })).toBeChecked();
 	await page.getByRole('button', { name: 'Add host' }).last().click();
 	await expect(page).toHaveURL(/\/hosts\/nas$/);
+	await expect(page.getByText('Lor infra', { exact: true })).toBeVisible();
 	await expect(page.getByText(/^SHA256:/)).toBeVisible();
 	await expect(page.getByText(/curl -fsSL '.*\/bootstrap\/nas\.sh\?t=/).first()).toBeVisible();
 	await page.screenshot({ path: join(shots, 'host.png'), fullPage: true });
@@ -183,4 +186,25 @@ test('grant access form (offer) with a chat line to copy', async () => {
 	// The agent claims it on first use.
 	const res = await lor('ssh', 'nas', '--', 'id');
 	expect(res.stderr).toContain('claimed the offer');
+});
+
+test('the component gallery is not part of production builds', async () => {
+	await page.goto('/gallery');
+	await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
+	await expect(page.getByText('Component gallery')).toHaveCount(0);
+});
+
+test('audit log filters by category and shows event details', async () => {
+	await page.goto('/audit');
+	await expect(page.getByTestId('audit-log')).toBeVisible();
+	await page.getByRole('radio', { name: 'Hosts' }).click();
+	await expect(page).toHaveURL(/action=host\./);
+	await expect(page.locator('[data-action^="grant."]')).toHaveCount(0);
+	const added = page.locator('[data-action="host.created"]').first();
+	await added.getByRole('button').click();
+	await expect(added.getByText('host.created')).toBeVisible();
+	// Arrow keys move the actor filter (radio group).
+	await page.getByRole('radio', { name: 'Everyone' }).focus();
+	await page.keyboard.press('ArrowRight');
+	await expect(page.getByRole('radio', { name: 'You' })).toBeChecked();
 });

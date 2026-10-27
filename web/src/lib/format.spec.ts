@@ -5,7 +5,8 @@ import {
 	formatDuration,
 	formatAgo,
 	formatClock,
-	offerChatLine
+	offerChatLine,
+	formatTimeOfDay
 } from './format';
 
 describe('formatDuration', () => {
@@ -74,5 +75,13 @@ describe('time zones', () => {
 		expect(offerChatLine('nas', 'sudo', end, 'UTC')).toBe(
 			'You have Lor access to `nas` (sudo) until 19:51 UTC. Use `lor ssh nas -- <cmd>`.'
 		);
+	});
+});
+
+describe('formatTimeOfDay', () => {
+	it('shows hours and minutes only', () => {
+		const t = formatTimeOfDay(new Date(2026, 9, 26, 14, 5, 59).getTime());
+		expect(t).toMatch(/0?2:05|14:05/);
+		expect(t).not.toMatch(/59/);
 	});
 });

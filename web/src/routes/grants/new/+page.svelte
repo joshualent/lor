@@ -1,5 +1,6 @@
 <script lang="ts">
 	import KeyRound from '@lucide/svelte/icons/key-round';
+	import Send from '@lucide/svelte/icons/send';
 	import { page } from '$app/state';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
@@ -11,10 +12,15 @@
 	import type { Level } from '#lib/api/client.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
-	import { Label } from '#lib/components/ui/label/index.js';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
+	import Callout from '#lib/components/lor/Callout.svelte';
+	import Card from '#lib/components/lor/Card.svelte';
+	import ChoiceCard from '#lib/components/lor/ChoiceCard.svelte';
 	import CopyField from '#lib/components/lor/CopyField.svelte';
 	import DurationPicker from '#lib/components/lor/DurationPicker.svelte';
+	import Field from '#lib/components/lor/Field.svelte';
 	import PageHeader from '#lib/components/lor/PageHeader.svelte';
 	import Section from '#lib/components/lor/Section.svelte';
 	import Warnings from '#lib/components/lor/Warnings.svelte';
@@ -95,135 +101,133 @@
 <PageHeader
 	title="Grant access"
 	subtitle="Give an agent access before it asks. The timer starts now."
+	back={{ href: '/', label: 'Home' }}
 />
 
 {#if message}
-	<Section title="Offer created">
-		<p class="mb-3">Paste this into the chat with the agent:</p>
-		<CopyField value={message} label="Copy message" />
-		<div class="mt-4 flex gap-2">
-			{#if createdId}<Button variant="secondary" href="/grants/{createdId}">View grant</Button>{/if}
+	<div class="space-y-5">
+		<Callout tone="success" title="Offer created">
+			The agent claims it on its next <code>lor ssh</code> or <code>lor request</code>.
+		</Callout>
+		<Section title="Paste this into the chat with the agent">
+			<Card><CopyField value={message} label="Copy message" /></Card>
+		</Section>
+		<div class="flex flex-wrap gap-2">
+			{#if createdId}<Button href="/grants/{createdId}">View grant</Button>{/if}
 			<Button variant="ghost" href="/">Done</Button>
 		</div>
-	</Section>
+	</div>
 {:else}
-	<form class="space-y-6" onsubmit={submit}>
+	<form class="space-y-7" onsubmit={submit}>
 		<!-- Locked while the passkey prompt is open: the action is already fixed. -->
 		<fieldset disabled={busy} class="contents">
-			<Section>
-				<div class="space-y-5">
-					<div class="space-y-2">
-						<Label for="agent">Agent</Label>
-						<select
-							id="agent"
-							bind:value={agentId}
-							class="h-10 w-full rounded-md border border-input bg-background px-3"
-							required
-						>
+			<Section title="Who and where">
+				<Card class="space-y-5">
+					<Field
+						label="Agent"
+						for="agent"
+						hint={agents.isSuccess && usableAgents.length === 0
+							? 'No enrolled agents yet. Add one on the Agents page.'
+							: undefined}
+					>
+						<NativeSelect id="agent" bind:value={agentId} required>
 							<option value={null} disabled>Choose an agent</option>
 							{#each usableAgents as a (a.id)}<option value={a.id}>{a.name}</option>{/each}
-						</select>
-						{#if agents.isSuccess && usableAgents.length === 0}
-							<p class="text-sm text-muted-foreground">
-								No enrolled agents yet. <a href="/agents">Add one</a>.
-							</p>
-						{/if}
-					</div>
-					<div class="space-y-2">
-						<Label for="host">Host</Label>
-						<select
-							id="host"
-							bind:value={hostId}
-							class="h-10 w-full rounded-md border border-input bg-background px-3"
-							required
-						>
+						</NativeSelect>
+					</Field>
+					<Field
+						label="Host"
+						for="host"
+						hint="Only enabled hosts with a scanned host key are listed."
+					>
+						<NativeSelect id="host" bind:value={hostId} required>
 							<option value={null} disabled>Choose a host</option>
 							{#each usableHosts as h (h.id)}<option value={h.id}>{h.name} · {h.address}</option
 								>{/each}
-						</select>
-					</div>
-					{#if host?.max_level === 'sudo'}
-						<fieldset class="space-y-2">
-							<legend class="mb-2 text-sm font-medium">Level</legend>
-							<label class="flex gap-3"
-								><input
-									type="radio"
-									bind:group={level}
-									value="user"
-									class="mt-1 size-4 accent-primary"
-								/>
-								<span
-									>Standard user <span class="block text-sm text-muted-foreground"
-										>Logs in as <code>agent</code>, no sudo.</span
-									></span
-								></label
-							>
-							<label class="flex gap-3"
-								><input
-									type="radio"
-									bind:group={level}
-									value="sudo"
-									class="mt-1 size-4 accent-primary"
-								/>
-								<span
-									>sudo (root) <span class="block text-sm text-muted-foreground"
-										>Logs in as <code>agent-sudo</code>.</span
-									></span
-								></label
-							>
-						</fieldset>
-					{/if}
-				</div>
+						</NativeSelect>
+					</Field>
+				</Card>
 			</Section>
+
+			{#if host?.max_level === 'sudo'}
+				<Section title="Level">
+					<div class="space-y-2" role="radiogroup" aria-label="Level">
+						<ChoiceCard name="level" value="user" bind:group={level} title="Standard user">
+							Logs in as <code>agent</code>, no sudo.
+						</ChoiceCard>
+						<ChoiceCard
+							name="level"
+							value="sudo"
+							bind:group={level}
+							title="sudo (root)"
+							tone="warning"
+						>
+							Logs in as <code>agent-sudo</code>. Can read, change or delete anything on {host.name}.
+						</ChoiceCard>
+					</div>
+				</Section>
+			{/if}
 
 			{#if host}<Warnings warnings={host.warnings} {level} />{/if}
 
 			<Section title="Duration">
-				<DurationPicker bind:value={duration} bind:valid={durationValid} id="offer-duration" />
+				<Card>
+					<DurationPicker bind:value={duration} bind:valid={durationValid} id="offer-duration" />
+				</Card>
 			</Section>
 
-			<Section>
-				<div class="space-y-2">
-					<Label for="note">Note (optional)</Label>
-					<Textarea
-						id="note"
-						bind:value={note}
-						rows={2}
-						maxlength={1000}
-						placeholder="What it's for"
-					/>
-				</div>
+			<Section title="Note">
+				<Card>
+					<Field label="Note" for="note" optional hint="For your records; shown on the grant.">
+						<Textarea
+							id="note"
+							bind:value={note}
+							rows={2}
+							maxlength={1000}
+							placeholder="What it's for"
+						/>
+					</Field>
+				</Card>
 			</Section>
 
-			{#if host && agent}
-				<Section title="Confirm">
-					<p data-testid="offer-summary">
-						{agent.name} gets <strong>{sudo ? 'sudo (root)' : 'standard user'}</strong> access to
-						<strong>{host.name}</strong> for {formatDuration(duration)}, until {formatClock(
-							endsAt,
-							clock.now
-						)}.
-					</p>
-					{#if sudo}
-						<label class="mt-4 flex items-start gap-3">
-							<Checkbox bind:checked={confirmed} id="confirm-sudo-offer" class="mt-0.5" />
-							<span>I understand this gives root on {host.name}</span>
-						</label>
+			<Section title="Confirm">
+				<Card class="space-y-4">
+					{#if host && agent}
+						<p data-testid="offer-summary" class="text-body">
+							{agent.name} gets
+							<strong class={sudo ? 'text-warning' : ''}
+								>{sudo ? 'sudo (root)' : 'standard user'}</strong
+							>
+							access to <strong>{host.name}</strong> for {formatDuration(duration)}, until
+							<span class="nums">{formatClock(endsAt, clock.now)}</span>.
+						</p>
+						{#if sudo}
+							<label
+								class="flex cursor-pointer items-start gap-3 rounded-lg border border-warning-edge bg-warning-tint px-3 py-2.5"
+							>
+								<Checkbox bind:checked={confirmed} id="confirm-sudo-offer" class="mt-0.5" />
+								<span class="text-callout">I understand this gives root on {host.name}</span>
+							</label>
+						{/if}
+					{:else}
+						<p class="text-callout text-muted-foreground">Choose an agent and a host first.</p>
 					{/if}
 					<Button
 						type="submit"
 						size="lg"
-						class="mt-4 w-full"
+						class="w-full"
 						disabled={!ready}
 						data-testid="create-offer"
 					>
-						<KeyRound />
+						{#if busy}<Spinner />{:else if host && agent}<KeyRound />{:else}<Send />{/if}
 						{busy
 							? 'Waiting for passkey…'
-							: `Grant ${sudo ? 'sudo' : 'standard user'} on ${host.name} for ${formatDuration(duration)}`}
+							: host && agent
+								? `Grant ${sudo ? 'sudo' : 'standard user'} on ${host.name} for ${formatDuration(duration)}`
+								: 'Grant access'}
 					</Button>
-				</Section>
-			{/if}
+				</Card>
+			</Section>
 		</fieldset>
 	</form>
 {/if}

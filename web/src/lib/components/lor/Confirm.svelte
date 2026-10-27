@@ -37,13 +37,15 @@
 {:else}
 	<Drawer.Root bind:open>
 		<Drawer.Content>
-			<div class="mx-auto w-full max-w-lg px-4 pb-2">
-				<Drawer.Header class="px-0 text-left">
+			<div class="mx-auto w-full max-w-lg overflow-y-auto px-4 pb-2">
+				<Drawer.Header class="px-0 pt-5 text-left">
 					<Drawer.Title>{title}</Drawer.Title>
 					{#if description}<Drawer.Description>{description}</Drawer.Description>{/if}
 				</Drawer.Header>
 				{@render children?.()}
-				<Drawer.Footer class="px-0">{@render footer()}</Drawer.Footer>
+				<Drawer.Footer class="px-0 pb-[max(1rem,env(safe-area-inset-bottom))]"
+					>{@render footer()}</Drawer.Footer
+				>
 			</div>
 		</Drawer.Content>
 	</Drawer.Root>

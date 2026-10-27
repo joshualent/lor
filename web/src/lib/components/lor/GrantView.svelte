@@ -1,34 +1,50 @@
 <script lang="ts">
+	// A grant: the consent view while a request is pending, otherwise its
+	// status, time left, command log, certificates and timeline. Used by
+	// /r/[id] (approval links) and /grants/[id].
 	import KeyRound from '@lucide/svelte/icons/key-round';
+	import TimerReset from '@lucide/svelte/icons/timer-reset';
+	import Check from '@lucide/svelte/icons/check';
+	import FileBadge from '@lucide/svelte/icons/file-badge';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
 	import { api, call, type Level } from '#lib/api/client.js';
 	import { clock } from '#lib/clock.svelte.js';
 	import { errorMessage, isCancel } from '#lib/errors.js';
-	import {
-		formatAgo,
-		formatArgv,
-		formatClock,
-		formatCountdown,
-		formatDuration,
-		formatTimestamp
-	} from '#lib/format.js';
+	import { formatAgo, formatClock, formatCountdown, formatDuration } from '#lib/format.js';
 	import { keys, fetchGrant, LIVE_MS } from '#lib/queries.js';
+	import { hostLook, passkeyName } from '#lib/status.js';
 	import { stepUp } from '#lib/webauthn.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
-	import { actionLabel } from '#lib/labels.js';
-	import Countdown from './Countdown.svelte';
-	import DurationPicker from './DurationPicker.svelte';
-	import Warnings from './Warnings.svelte';
-	import UnverifiedText from './UnverifiedText.svelte';
+	import ActionBar from './ActionBar.svelte';
+	import Callout from './Callout.svelte';
+	import Card from './Card.svelte';
+	import ChoiceCard from './ChoiceCard.svelte';
+	import CommandLog from './CommandLog.svelte';
 	import Confirm from './Confirm.svelte';
+	import Countdown from './Countdown.svelte';
+	import DescriptionItem from './DescriptionItem.svelte';
+	import DescriptionList from './DescriptionList.svelte';
+	import DurationPicker from './DurationPicker.svelte';
+	import ErrorState from './ErrorState.svelte';
 	import ExtendDialog from './ExtendDialog.svelte';
-	import Row from './Row.svelte';
+	import IconTile from './IconTile.svelte';
+	import LevelBadge from './LevelBadge.svelte';
+	import List from './List.svelte';
+	import ListRow from './ListRow.svelte';
+	import PageHeader from './PageHeader.svelte';
+	import PageSkeleton from './PageSkeleton.svelte';
 	import Section from './Section.svelte';
-	import Status from './Status.svelte';
+	import StatusBadge from './StatusBadge.svelte';
+	import TimeBar from './TimeBar.svelte';
+	import Timeline from './Timeline.svelte';
+	import UnverifiedText from './UnverifiedText.svelte';
+	import Warnings from './Warnings.svelte';
 
 	let { id }: { id: number } = $props();
 	const qc = useQueryClient();
@@ -133,184 +149,232 @@
 
 	const levelText = (l: string) => (l === 'sudo' ? 'sudo' : 'standard user');
 	const isRequest = $derived(g?.origin === 'agent_request');
+	const kindLabel = $derived(isRequest ? 'Request' : 'Offer');
 	const levelSummary = $derived(
 		g
 			? levelText(g.level) +
 					(g.level !== g.requested_level ? ` (asked for ${levelText(g.requested_level)})` : '')
 			: ''
 	);
+	const live = $derived(g?.status === 'active' || g?.status === 'offered');
+	const host = $derived(g ? hostLook(g.host) : null);
 </script>
 
 {#if q.isPending}
-	<p class="text-muted-foreground">Loading…</p>
+	<PageSkeleton />
 {:else if q.isError}
-	<p class="text-destructive">{errorMessage(q.error)}</p>
-{:else if g}
+	<ErrorState error={q.error} onretry={() => q.refetch()} back={{ href: '/', label: 'Home' }} />
+{:else if g && host}
 	<!-- ============================================================ consent view -->
 	{#if g.consent && g.actions.authorize}
-		<article class="space-y-6" data-testid="consent">
-			<header>
-				<h1 class="text-2xl leading-tight">
-					<span class="font-normal text-muted-foreground">{g.agent.name} wants access to</span>
-					{g.host.name}
-				</h1>
-				<p class="mt-1 text-sm text-muted-foreground">
-					Request #{g.id} · {formatAgo(Date.parse(g.requested_at), clock.now)} · approve within
-					{formatCountdown(Date.parse(g.consent.approval_deadline), clock.now)}
-				</p>
-			</header>
+		<article class="space-y-7" data-testid="consent">
+			<PageHeader
+				title="{g.agent.name} wants access to {g.host.name}"
+				back={{ href: '/', label: 'Home' }}
+			>
+				{#snippet leading()}<IconTile icon={host.icon} tone={host.tone} size="lg" />{/snippet}
+				{#snippet heading()}
+					<span class="block text-callout font-normal tracking-normal text-muted-foreground"
+						>{g.agent.name} wants access to</span
+					>{g.host.name}
+				{/snippet}
+				{#snippet meta()}
+					<StatusBadge status={g.status} />
+					<Badge tone="neutral"
+						>Approve within {formatCountdown(
+							Date.parse(g.consent!.approval_deadline),
+							clock.now
+						)}</Badge
+					>
+					<span class="text-footnote text-muted-foreground"
+						>Request #{g.id} · {formatAgo(Date.parse(g.requested_at), clock.now)}</span
+					>
+				{/snippet}
+			</PageHeader>
 
 			<Warnings warnings={g.warnings} {level} />
 
-			<Section>
-				<dl class="text-[15px]">
-					<Row label="Host"
-						>{g.host.name} · <span class="font-mono text-sm">{g.host.address}</span></Row
-					>
-					<Row label="Agent"
-						>{g.agent.name} <span class="text-muted-foreground">(enrolled agent)</span></Row
-					>
-					<Row label="Connect from"
-						>only <span class="font-mono text-sm">{g.agent.lan_addrs.join(', ')}</span></Row
-					>
-					<Row label="Asked for"
-						>{levelText(g.requested_level)} for {formatDuration(g.requested_duration_s ?? 0)}</Row
-					>
-				</dl>
+			<UnverifiedText text={g.reason} />
+
+			<Section title="Request">
+				<DescriptionList>
+					<DescriptionItem label="Host">
+						{g.host.name}
+						<span class="font-mono text-callout text-muted-foreground">{g.host.address}</span>
+					</DescriptionItem>
+					<DescriptionItem label="Agent">{g.agent.name}</DescriptionItem>
+					<DescriptionItem label="Connect from">
+						only <span class="font-mono text-callout">{g.agent.lan_addrs.join(', ')}</span>
+					</DescriptionItem>
+					<DescriptionItem label="Asked for">
+						{levelText(g.requested_level)} for {formatDuration(g.requested_duration_s ?? 0)}
+					</DescriptionItem>
+				</DescriptionList>
 			</Section>
 
 			<Section title="Level">
 				<div class="space-y-2" role="radiogroup" aria-label="Level">
 					{#each g.consent.levels as l (l)}
-						<label
-							class="flex cursor-pointer gap-3 rounded-lg border p-3 {level === l
-								? 'border-primary bg-primary/6'
-								: 'border-border'}"
-						>
-							<input
-								type="radio"
+						{#if l === 'sudo'}
+							<ChoiceCard
 								name="level"
-								value={l}
+								value="sudo"
 								bind:group={level}
-								class="mt-1 size-4 accent-primary"
-							/>
-							<span>
-								<span class="block font-medium"
-									>{l === 'sudo' ? 'sudo (root)' : 'Standard user'}</span
-								>
-								<span class="block text-sm text-muted-foreground">
-									{#if l === 'sudo'}
-										Logs in as <code>agent-sudo</code>. Can read, change or delete anything on {g
-											.host.name}.
-									{:else}
-										Logs in as <code>agent</code> (no sudo). Can run programs and read files any normal
-										user can read. Can't install software or change system settings.
-									{/if}
-								</span>
-							</span>
-						</label>
+								title="sudo (root)"
+								tone="warning"
+							>
+								Logs in as <code>agent-sudo</code>. Can read, change or delete anything on {g.host
+									.name}.
+							</ChoiceCard>
+						{:else}
+							<ChoiceCard name="level" value="user" bind:group={level} title="Standard user">
+								Logs in as <code>agent</code> (no sudo). Can run programs and read files any normal user
+								can read. Can't install software or change system settings.
+							</ChoiceCard>
+						{/if}
 					{/each}
 				</div>
 			</Section>
 
 			<Section title="Duration">
-				<DurationPicker bind:value={duration} bind:valid={durationValid} />
-				<p class="mt-3 text-sm text-muted-foreground">
-					→ ends {formatClock(endsAt, clock.now)} (extendable)
-				</p>
+				<Card>
+					<DurationPicker bind:value={duration} bind:valid={durationValid} />
+					<p class="mt-3 border-t border-separator pt-3 text-callout text-muted-foreground">
+						Ends <span class="font-medium text-foreground nums"
+							>{formatClock(endsAt, clock.now)}</span
+						> · extendable
+					</p>
+				</Card>
 			</Section>
 
 			<Section title="Limits">
-				<ul class="list-inside list-disc space-y-0.5 text-sm text-muted-foreground">
-					{#each g.consent.limits as lim (lim)}<li>{lim}</li>{/each}
+				<ul class="space-y-2 rounded-xl bg-card px-4 py-3">
+					{#each g.consent.limits as lim (lim)}
+						<li class="flex gap-2.5 text-callout text-muted-foreground">
+							<Check class="mt-0.5 size-4 shrink-0 text-success" aria-hidden="true" />{lim}
+						</li>
+					{/each}
 				</ul>
 			</Section>
 
-			<UnverifiedText text={g.reason} />
-
-			<div
-				class="sticky bottom-0 -mx-4 space-y-3 border-t bg-background/95 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur sm:static sm:mx-0 sm:border-0 sm:px-0"
-			>
-				{#if sudo}
-					<label class="flex items-start gap-3">
-						<Checkbox bind:checked={confirmed} id="confirm-sudo" class="mt-0.5" />
-						<span>I understand this gives root on {g.host.name}</span>
-					</label>
-				{/if}
-				<div class="flex flex-col gap-2 sm:flex-row">
-					<Button
-						size="lg"
-						class="sm:flex-1"
-						disabled={!canAuthorize || busy !== null}
-						onclick={authorize}
-						data-testid="authorize"
-					>
-						<KeyRound />
-						{busy === 'authorize'
-							? 'Waiting for passkey…'
-							: `Authorize ${sudo ? 'sudo' : 'standard user'} on ${g.host.name} for ${formatDuration(duration)}`}
-					</Button>
-					<Button
-						size="lg"
-						variant="outline"
-						disabled={busy !== null}
-						onclick={() => (denyOpen = true)}>Deny</Button
-					>
-				</div>
-			</div>
+			<ActionBar>
+				{#snippet note()}
+					{#if sudo}
+						<label
+							class="flex cursor-pointer items-start gap-3 rounded-lg border border-warning-edge bg-warning-tint px-3 py-2.5"
+						>
+							<Checkbox bind:checked={confirmed} id="confirm-sudo" class="mt-0.5" />
+							<span class="text-callout">I understand this gives root on {g.host.name}</span>
+						</label>
+					{/if}
+				{/snippet}
+				<Button
+					size="lg"
+					class="sm:flex-1"
+					disabled={!canAuthorize || busy !== null}
+					onclick={authorize}
+					data-testid="authorize"
+				>
+					{#if busy === 'authorize'}<Spinner />{:else}<KeyRound />{/if}
+					{busy === 'authorize'
+						? 'Waiting for passkey…'
+						: `Authorize ${sudo ? 'sudo' : 'standard user'} on ${g.host.name} for ${formatDuration(duration)}`}
+				</Button>
+				<Button
+					size="lg"
+					variant="outline"
+					disabled={busy !== null}
+					onclick={() => (denyOpen = true)}>Deny</Button
+				>
+			</ActionBar>
 		</article>
 	{:else}
 		<!-- ============================================================ decided / active view -->
-		<article class="space-y-6" data-testid="grant">
-			<header>
-				<h1 class="text-2xl leading-tight">
-					{g.host.name}
-					<span class="font-normal text-muted-foreground">· {g.agent.name}</span>
-				</h1>
-				<p class="mt-1 text-sm text-muted-foreground">
-					{isRequest ? 'Request' : 'Offer'} #{g.id} · {levelSummary}
-				</p>
-			</header>
+		<article class="space-y-7" data-testid="grant">
+			<PageHeader
+				title={g.host.name}
+				subtitle="{g.agent.name} · {kindLabel} #{g.id}"
+				back={{ href: '/', label: 'Home' }}
+				documentTitle="{g.host.name} · {kindLabel} #{g.id}"
+			>
+				{#snippet leading()}<IconTile icon={host.icon} tone={host.tone} size="lg" />{/snippet}
+				{#snippet meta()}
+					<StatusBadge status={g.status} />
+					<LevelBadge level={g.level} />
+				{/snippet}
+			</PageHeader>
 
-			<Section>
-				<dl>
-					<Row label="Status"><Status status={g.status} /></Row>
-					{#if g.status === 'active' || g.status === 'offered'}
-						<Row label="Ends">
-							{formatClock(Date.parse(g.valid_before!), clock.now)} · <Countdown
-								end={g.valid_before}
-							/>
-						</Row>
-					{:else if g.ended_at}
-						<Row label="Ended">{formatTimestamp(Date.parse(g.ended_at))}</Row>
-					{/if}
-					{#if g.decided_by}<Row label="Decided by">{g.decided_by.replace(/^admin:/, '')}</Row>{/if}
-					{#if g.decision_note && isRequest}<Row label="Note">{g.decision_note}</Row>{/if}
-					<Row label="Host"
-						>{g.host.name} · <span class="font-mono text-sm">{g.host.address}</span></Row
-					>
-					<Row label="Connect from"
-						><span class="font-mono text-sm">{g.agent.lan_addrs.join(', ')}</span></Row
-					>
-					{#if g.public_key_fp}<Row label="Key"
-							><span class="font-mono text-xs break-all">{g.public_key_fp}</span></Row
-						>{/if}
-				</dl>
-				{#if g.actions.extend || g.actions.revoke}
-					<div class="mt-4 flex gap-2">
-						{#if g.actions.extend}<Button variant="secondary" onclick={() => (extendOpen = true)}
-								>Extend</Button
-							>{/if}
-						{#if g.actions.revoke}<Button variant="destructive" onclick={() => (revokeOpen = true)}
-								>{g.status === 'offered' ? 'Withdraw offer' : 'Revoke'}</Button
-							>{/if}
+			{#if live && g.valid_before}
+				<Card padding="lg">
+					<div class="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+						<div>
+							<p class="text-footnote text-muted-foreground">
+								{g.status === 'offered' ? 'Offer open, not claimed yet' : 'Access ends in'}
+							</p>
+							<p class="text-title nums">
+								<Countdown end={g.valid_before} suffix="" />
+							</p>
+						</div>
+						<p class="text-callout text-muted-foreground">
+							Ends {formatClock(Date.parse(g.valid_before), clock.now)}
+						</p>
 					</div>
-				{/if}
-			</Section>
-
-			{#if g.status === 'active' || g.status === 'offered'}
+					{#if g.valid_after}
+						<TimeBar start={g.valid_after} end={g.valid_before} class="mt-3" />
+					{/if}
+					{#if g.actions.extend || g.actions.revoke}
+						<div class="mt-4 flex gap-2">
+							{#if g.actions.extend}<Button
+									variant="secondary"
+									class="flex-1 sm:flex-none"
+									onclick={() => (extendOpen = true)}><TimerReset /> Extend</Button
+								>{/if}
+							{#if g.actions.revoke}<Button
+									variant="destructive"
+									class="flex-1 sm:flex-none"
+									onclick={() => (revokeOpen = true)}
+									>{g.status === 'offered' ? 'Withdraw offer' : 'Revoke'}</Button
+								>{/if}
+						</div>
+					{/if}
+				</Card>
 				<Warnings warnings={g.warnings} level={g.level} />
 			{/if}
+
+			{#if g.pending_extension}
+				<Callout tone="warning" icon={TimerReset} title="Extension requested">
+					{g.agent.name} asks for +{formatDuration(g.pending_extension.requested_duration_s)}.
+					{#snippet action()}
+						<Button size="sm" href="/e/{g.pending_extension!.id}">Review the request</Button>
+					{/snippet}
+				</Callout>
+			{/if}
+
+			<Section title="Details">
+				<DescriptionList>
+					<DescriptionItem label="Level">{levelSummary}</DescriptionItem>
+					{#if !live && g.ended_at}
+						<DescriptionItem label="Ended"
+							>{formatClock(Date.parse(g.ended_at), clock.now)}</DescriptionItem
+						>
+					{/if}
+					{#if g.decided_by}<DescriptionItem label="Decided by"
+							>{passkeyName(g.decided_by)}</DescriptionItem
+						>{/if}
+					{#if g.decision_note && isRequest}<DescriptionItem label="Note" layout="stacked"
+							>{g.decision_note}</DescriptionItem
+						>{/if}
+					<DescriptionItem label="Host">
+						{g.host.name}
+						<span class="font-mono text-callout text-muted-foreground">{g.host.address}</span>
+					</DescriptionItem>
+					<DescriptionItem label="Connect from" mono>{g.agent.lan_addrs.join(', ')}</DescriptionItem
+					>
+					{#if g.public_key_fp}<DescriptionItem label="Key" layout="stacked" mono
+							>{g.public_key_fp}</DescriptionItem
+						>{/if}
+				</DescriptionList>
+			</Section>
 
 			{#if g.reason}
 				<UnverifiedText
@@ -319,78 +383,56 @@
 				/>
 			{/if}
 
-			{#if g.pending_extension}
-				<Section title="Extension requested">
-					<p>
-						+{formatDuration(g.pending_extension.requested_duration_s)} ·
-						<a href="/e/{g.pending_extension.id}">Review the request</a>
-					</p>
-				</Section>
-			{/if}
-
-			<Section title="Command log">
-				<p class="mb-3 text-sm text-muted-foreground">
-					Reported by the agent's CLI. It shows what <code>lor ssh</code> was asked to run, not what actually
-					happened.
-				</p>
-				{#if g.commands.length === 0}
-					<p class="text-sm text-muted-foreground">No commands reported yet.</p>
-				{:else}
-					<ol class="space-y-2" data-testid="command-log">
-						{#each g.commands as c (c.id)}
-							<li class="grid grid-cols-[auto_1fr] gap-x-3 text-sm">
-								<span class="text-muted-foreground tabular-nums"
-									>{formatClock(Date.parse(c.reported_at), clock.now)}</span
-								>
-								<code class="break-all whitespace-pre-wrap">{formatArgv(c.argv)}</code>
-							</li>
-						{/each}
-					</ol>
-				{/if}
+			<Section
+				title="Command log"
+				count={g.commands.length || undefined}
+				footnote="Reported by the agent's CLI. It shows what lor ssh was asked to run, not what actually happened."
+			>
+				<CommandLog commands={g.commands} />
 			</Section>
 
 			{#if g.extensions.length}
 				<Section title="Extension requests">
-					<ul class="space-y-3">
+					<List>
 						{#each g.extensions as x (x.id)}
-							<li class="text-sm">
-								<a href="/e/{x.id}">+{formatDuration(x.requested_duration_s)}</a> ·
-								<Status status={x.status} />
-							</li>
+							<ListRow
+								href="/e/{x.id}"
+								title="+{formatDuration(x.requested_duration_s)}"
+								subtitle={formatAgo(Date.parse(x.requested_at), clock.now)}
+							>
+								{#snippet leading()}<IconTile icon={TimerReset} size="sm" />{/snippet}
+								{#snippet metaContent()}<StatusBadge status={x.status} kind="extension" />{/snippet}
+							</ListRow>
 						{/each}
-					</ul>
+					</List>
 				</Section>
 			{/if}
 
-			<Section title="Certificates">
+			<Section title="Certificates" count={g.certificates.length || undefined}>
 				{#if g.certificates.length === 0}
-					<p class="text-sm text-muted-foreground">None issued.</p>
+					<p class="rounded-xl bg-card px-4 py-3.5 text-callout text-muted-foreground">
+						None issued{g.status === 'offered'
+							? ' yet: the agent claims the offer on first use'
+							: ''}.
+					</p>
 				{:else}
-					<ul class="space-y-1 text-sm">
+					<List>
 						{#each g.certificates as c (c.id)}
-							<li>
-								Serial {c.id} · until {formatClock(Date.parse(c.valid_before), clock.now)}
-								<span class="text-muted-foreground">· {c.issued_by.replace(/^admin:/, '')}</span>
-							</li>
+							<ListRow
+								title="Serial {c.id}"
+								subtitle="Issued by {passkeyName(c.issued_by)}"
+								meta="until {formatClock(Date.parse(c.valid_before), clock.now)}"
+								density="compact"
+							>
+								{#snippet leading()}<IconTile icon={FileBadge} tone="teal" size="sm" />{/snippet}
+							</ListRow>
 						{/each}
-					</ul>
+					</List>
 				{/if}
 			</Section>
 
 			<Section title="Timeline">
-				<ol class="space-y-1.5 text-sm">
-					{#each g.timeline as ev (ev.id)}
-						<li class="grid grid-cols-[auto_1fr] gap-x-3">
-							<span class="text-muted-foreground tabular-nums"
-								>{formatTimestamp(Date.parse(ev.ts))}</span
-							>
-							<span
-								>{actionLabel(ev.action)}
-								<span class="text-muted-foreground">· {ev.actor}</span></span
-							>
-						</li>
-					{/each}
-				</ol>
+				<Timeline events={g.timeline} />
 			</Section>
 		</article>
 	{/if}
