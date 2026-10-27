@@ -7,14 +7,19 @@
 	import { errorMessage } from '#lib/errors.js';
 	import { formatTimeOfDay } from '#lib/format.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 
 	let {
 		error,
 		updatedAt,
+		fetching = false,
 		onretry
 	}: {
 		error: unknown;
-		/** ms since epoch of the shown data */ updatedAt: number;
+		/** ms since epoch of the shown data */
+		updatedAt: number;
+		/** A retry is in flight. */
+		fetching?: boolean;
 		onretry: () => void;
 	} = $props();
 </script>
@@ -30,5 +35,7 @@
 		Showing data from {formatTimeOfDay(updatedAt)}.
 		<span class="text-muted-foreground">{errorMessage(error)}</span>
 	</p>
-	<Button size="sm" variant="secondary" onclick={onretry}><RotateCw /> Retry</Button>
+	<Button size="sm" variant="secondary" disabled={fetching} onclick={onretry}
+		>{#if fetching}<Spinner />{:else}<RotateCw />{/if} Retry</Button
+	>
 </div>

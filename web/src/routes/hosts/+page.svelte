@@ -115,13 +115,19 @@
 {#if hosts.isError && hosts.data}<StaleNotice
 		error={hosts.error}
 		updatedAt={hosts.dataUpdatedAt}
+		fetching={hosts.isFetching}
 		onretry={() => hosts.refetch()}
 	/>{/if}
 
 {#if hosts.isPending}
 	<ListSkeleton rows={4} />
 {:else if hosts.isError && !hosts.data}
-	<ErrorState error={hosts.error} onretry={() => hosts.refetch()} variant="inset" />
+	<ErrorState
+		error={hosts.error}
+		fetching={hosts.isFetching}
+		onretry={() => hosts.refetch()}
+		variant="inset"
+	/>
 {:else if all.length === 0}
 	<EmptyState
 		icon={Server}

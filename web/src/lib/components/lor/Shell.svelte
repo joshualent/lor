@@ -87,13 +87,13 @@
 					aria-label="Lor home">Lor</a
 				>
 				<nav
-					class="-mx-1 no-scrollbar flex flex-1 gap-0.5 overflow-x-auto sm:gap-1"
+					class="-mx-1 -my-1.5 no-scrollbar flex flex-1 gap-0.5 overflow-x-auto py-1.5 sm:gap-1"
 					aria-label="Main"
 				>
 					{#each nav as n (n.href)}
 						<a
 							href={n.href}
-							class="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1.5 text-sm whitespace-nowrap no-underline! focus-ring transition-colors sm:px-2.5 {active(
+							class="relative inline-flex items-center gap-1.5 rounded-md px-1.5 py-1.5 text-sm whitespace-nowrap no-underline! focus-ring transition-colors after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-[''] sm:px-2.5 {active(
 								n.href
 							)
 								? 'bg-secondary text-foreground'

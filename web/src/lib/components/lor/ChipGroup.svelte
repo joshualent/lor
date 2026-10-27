@@ -72,7 +72,9 @@
 	tabindex="-1"
 	class={cn(
 		'flex gap-2',
-		scroll ? '-mx-4 no-scrollbar overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0' : 'flex-wrap',
+		scroll
+			? '-mx-4 -my-1.5 no-scrollbar overflow-x-auto px-4 py-1.5 sm:mx-0 sm:flex-wrap sm:px-0'
+			: 'flex-wrap',
 		className
 	)}
 	onkeydown={(e) => onRadioKeydown(e, select)}

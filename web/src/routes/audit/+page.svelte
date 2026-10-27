@@ -133,13 +133,14 @@
 {#if q.isError && q.data}<StaleNotice
 		error={q.error}
 		updatedAt={q.dataUpdatedAt}
+		fetching={q.isFetching}
 		onretry={() => q.refetch()}
 	/>{/if}
 
 {#if q.isPending}
 	<ListSkeleton rows={8} />
 {:else if q.isError && !q.data}
-	<ErrorState error={q.error} onretry={() => q.refetch()} variant="inset" />
+	<ErrorState error={q.error} fetching={q.isFetching} onretry={() => q.refetch()} variant="inset" />
 {:else if events.length === 0}
 	<EmptyState
 		icon={ScrollText}

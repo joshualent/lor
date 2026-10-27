@@ -14,6 +14,7 @@
 	import { keys, fetchDashboard, LIVE_MS, type Summary } from '#lib/queries.js';
 	import { hostLook } from '#lib/status.js';
 	import { useNames } from '#lib/names.svelte.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { REVOKE_NOTE, WITHDRAW_NOTE } from '#lib/status.js';
@@ -98,7 +99,9 @@
 		{#if summary.length}
 			<nav aria-label="Summary" class="-mt-2 flex flex-wrap gap-x-3 gap-y-1 text-callout">
 				{#each summary as x (x.href)}
-					<a href={x.href} class="text-muted-foreground hover:text-foreground"
+					<a
+						href={x.href}
+						class="-mx-1 rounded-md px-1 py-1.5 text-muted-foreground no-underline! focus-ring hover:text-foreground"
 						><span class="font-medium text-foreground nums">{x.n}</span> {x.label}</a
 					>
 				{/each}
@@ -115,7 +118,8 @@
 			onclick={() => {
 				extendFor = g;
 				extendOpen = true;
-			}}>Extend</Button
+			}}
+			aria-label="Extend {g.host.name}">Extend</Button
 		>
 		<Button
 			size="sm"
@@ -124,7 +128,9 @@
 			onclick={() => {
 				revokeFor = g;
 				revokeOpen = true;
-			}}>{g.status === 'offered' ? 'Withdraw' : 'Revoke'}</Button
+			}}
+			aria-label="{g.status === 'offered' ? 'Withdraw offer for' : 'Revoke'} {g.host.name}"
+			>{g.status === 'offered' ? 'Withdraw' : 'Revoke'}</Button
 		>
 	</div>
 {/snippet}
@@ -132,13 +138,14 @@
 {#if q.isError && q.data}<StaleNotice
 		error={q.error}
 		updatedAt={q.dataUpdatedAt}
+		fetching={q.isFetching}
 		onretry={() => q.refetch()}
 	/>{/if}
 
 {#if q.isPending}
 	<PageSkeleton header={false} sections={3} />
 {:else if q.isError && !q.data}
-	<ErrorState error={q.error} onretry={() => q.refetch()} />
+	<ErrorState error={q.error} fetching={q.isFetching} onretry={() => q.refetch()} />
 {:else if d}
 	<div class="space-y-8">
 		{#if pendingCount > 0}
@@ -159,6 +166,9 @@
 									<LevelBadge level={g.requested_level} short />
 									<span class="font-normal text-muted-foreground">on</span>
 									<span>{g.host.name}</span>
+									{#each hostLook(g.host).badges as b (b.label)}<Badge tone={b.tone}
+											>{b.label}</Badge
+										>{/each}
 								</span>
 							{/snippet}
 							{#snippet subtitleContent()}
@@ -184,6 +194,10 @@
 								{x.grant.agent.name}
 								<span class="font-normal text-muted-foreground">wants more time on</span>
 								{x.grant.host.name}
+								{#each hostLook(x.grant.host).badges as b (b.label)}<Badge
+										tone={b.tone}
+										class="ml-1">{b.label}</Badge
+									>{/each}
 							{/snippet}
 							{#snippet subtitleContent()}
 								<span class="line-clamp-2">“{x.extension.reason}”</span>
@@ -200,7 +214,13 @@
 
 		{#snippet grantRow(g: Summary)}
 			{@const look = hostLook(g.host)}
-			<ListRow href="/grants/{g.id}" label="{g.host.name}, {g.agent.name}">
+			<ListRow
+				href="/grants/{g.id}"
+				label="{g.host.name}, {g.agent.name}{g.level === 'sudo' ? ', sudo' : ''}{g.status ===
+				'offered'
+					? ', offer not claimed yet'
+					: ''}"
+			>
 				{#snippet leading()}<IconTile icon={look.icon} tone={look.tone} />{/snippet}
 				{#snippet titleContent()}
 					<span class="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -209,7 +229,15 @@
 					</span>
 				{/snippet}
 				{#snippet subtitleContent()}
-					{g.agent.name}{g.status === 'offered' ? ' · not claimed yet' : ''}
+					{[
+						g.agent.name,
+						g.status === 'offered' ? 'not claimed yet' : undefined,
+						g.last_command
+							? `ran a command ${formatAgo(Date.parse(g.last_command.reported_at), clock.now)}`
+							: undefined
+					]
+						.filter(Boolean)
+						.join(' · ')}
 				{/snippet}
 				{#snippet metaContent()}
 					{#if g.status === 'offered'}<StatusBadge status="offered" />{/if}
@@ -219,16 +247,13 @@
 					{@render grantActions(g, 'hidden gap-1 sm:flex')}
 				{/snippet}
 				{#if g.last_command}
-					<p class="-mt-1.5 flex min-w-0 items-baseline gap-1.5 pr-4 pb-3 pl-16 text-footnote">
+					<p class="-mt-1.5 flex min-w-0 gap-1.5 pr-4 pb-3 pl-16 text-footnote">
 						<SquareTerminal
-							class="size-3.5 shrink-0 self-center text-icon-muted"
+							class="mt-0.5 size-3.5 shrink-0 text-icon-muted"
 							aria-label="Last command"
 						/>
-						<code class="min-w-0 truncate text-foreground/85"
+						<code class="line-clamp-2 min-w-0 wrap-anywhere text-foreground/85"
 							>{formatArgv(g.last_command.argv)}</code
-						>
-						<span class="shrink-0 text-muted-foreground"
-							>· {formatAgo(Date.parse(g.last_command.reported_at), clock.now)}</span
 						>
 					</p>
 				{/if}

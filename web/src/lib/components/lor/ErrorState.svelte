@@ -4,6 +4,7 @@
 	import SearchX from '@lucide/svelte/icons/search-x';
 	import RotateCw from '@lucide/svelte/icons/rotate-cw';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { ApiError } from '#lib/api/error.js';
 	import { errorMessage } from '#lib/errors.js';
 	import EmptyState from './EmptyState.svelte';
@@ -13,6 +14,7 @@
 		title,
 		onretry,
 		back,
+		fetching = false,
 		variant = 'page'
 	}: {
 		error: unknown;
@@ -21,6 +23,8 @@
 		/** Where to go instead, e.g. { href: '/hosts', label: 'All hosts' }. */
 		back?: { href: string; label: string };
 		variant?: 'inset' | 'page';
+		/** A retry is in flight. */
+		fetching?: boolean;
 	} = $props();
 
 	const notFound = $derived(error instanceof ApiError && error.status === 404);
@@ -36,7 +40,9 @@
 >
 	{#snippet action()}
 		{#if onretry && !notFound}
-			<Button variant="secondary" onclick={onretry}><RotateCw /> Try again</Button>
+			<Button variant="secondary" disabled={fetching} onclick={onretry}
+				>{#if fetching}<Spinner />{:else}<RotateCw />{/if} Try again</Button
+			>
 		{/if}
 		{#if back}<Button variant={notFound ? 'secondary' : 'ghost'} href={back.href}
 				>{back.label}</Button

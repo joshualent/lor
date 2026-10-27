@@ -111,3 +111,43 @@ wording.
 | Expanded audit details should show the full timestamp | **Accepted** | Seconds and time zone shown next to the action in the expanded details. |
 | Input and checkbox focus keep their halo treatment | **Kept** | Their accent border changes to the solid accent color on focus (≥ 3:1) in addition to the halo; the owner likes the current inputs, so their look stays. |
 | Out of scope (flagged by the reviewer) | **Declined** | Light theme, gradients, saturated surfaces, heavier chrome, new control styling, charts, notifications, bulk approvals, rich-text reasons, weaker trust labels, reworded warnings, removing the sudo acknowledgement, fewer passkey taps. |
+
+## Round 3 (final check)
+
+Screenshots: `lor-design-review/final/` (taken again after the round-3
+changes below).
+
+| Category | Round 1 | Round 2 | Round 3 |
+|---|---:|---:|---:|
+| Visual hierarchy | 7 | 8 | 9 |
+| Typography | 8 | 8 | 8 |
+| Color use and meaning | 7 | 9 | 9 |
+| Consistency / design-system coherence | 8 | 8 | 9 |
+| App-likeness and affordance | 7 | 8 | 9 |
+| Navigation and information architecture | 7 | 8 | 8 |
+| Information density and scannability | 7 | 8 | 8 |
+| Feedback and states | 7 | 7 | 8 |
+| Mobile experience | 6 | 8 | 8 |
+| Accessibility | 6 | 7 | 8 |
+| Overall polish | 7 | 8 | 9 |
+| **Overall** | **7** | **8** | **8.5** |
+
+The reviewer marked the round-2 findings resolved except: stale-data
+handling on the offer form and settings, overlapping enlarged hit areas,
+and phone date wrapping (partly resolved). It recommended the first three
+items below before sign-off; all five (and the smaller notes) were applied
+after this review.
+
+### Decisions
+
+| Finding | Decision | What changed / why |
+|---|---|---|
+| Offer form disappears on a failed background refresh; Settings has no stale notice; Retry shows no progress | **Accepted** | The offer form keeps its draft and shows a `StaleNotice`; Settings too. `StaleNotice` and `ErrorState` retries show a spinner and are disabled while fetching. |
+| Passkey icon buttons' 44 px hit areas overlap; scrolling chips clip theirs; nav and back links small | **Accepted** | Trailing row controls are 12 px apart (44 px centers); chip and nav scrollers get vertical room; nav items and the back link get 44 px hit areas. Visuals unchanged. |
+| Choosing Custom keeps showing the previous "1 h" | **Accepted** | Empty custom input says "Type a duration…"; end-time lines and Authorize/Extend/Grant labels say a duration is needed until it's valid. The submit gate is unchanged. |
+| Pending rows don't show the host's risk | **Accepted** | Server-provided Lor infra / Hypervisor badges on pending requests and extensions. |
+| Phone time comparisons wrap unpredictably | **Accepted** | `TimeStack`: label, time (AM/PM kept together) with the zone, and the day ("Today", "Tomorrow", "Oct 27") on fixed lines, in the extend dialog and on the extension page. |
+| Agents header: action drops below the subtitle | **Accepted** | `PageHeader` keeps title and actions on one row and puts the subtitle underneath. |
+| Home summary links look passive | **Accepted** | Hit area and focus ring. |
+| Home command previews truncated; repeated Extend/Revoke names | **Accepted** | Commands get two lines (recency moved to the subtitle); buttons are named "Extend nas", "Revoke nas"; the row's name includes sudo/offer state. |
+| Out of scope (flagged by the reviewer) | **Declined** | Same list as before; the reviewer noted none is needed. |

@@ -106,7 +106,9 @@
 			>
 				{customInvalid
 					? 'Use minutes, hours, days or weeks, like 90m or 2d.'
-					: formatDuration(value)}
+					: customText.trim() === ''
+						? 'Type a duration, like 90m or 2d.'
+						: formatDuration(value)}
 			</p>
 		</div>
 	{/if}

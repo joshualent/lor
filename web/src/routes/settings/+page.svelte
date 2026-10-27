@@ -34,6 +34,7 @@
 	import ListSkeleton from '#lib/components/lor/ListSkeleton.svelte';
 	import PageHeader from '#lib/components/lor/PageHeader.svelte';
 	import Section from '#lib/components/lor/Section.svelte';
+	import StaleNotice from '#lib/components/lor/StaleNotice.svelte';
 
 	const qc = useQueryClient();
 	const passkeys = createQuery(() => ({ queryKey: keys.passkeys, queryFn: fetchPasskeys }));
@@ -122,6 +123,18 @@
 
 <PageHeader title="Settings" subtitle="Passkeys, sessions and how this Lor is set up." />
 
+{#if (passkeys.isError && passkeys.data) || (sessions.isError && sessions.data)}
+	<StaleNotice
+		error={passkeys.error ?? sessions.error}
+		updatedAt={Math.min(passkeys.dataUpdatedAt, sessions.dataUpdatedAt)}
+		fetching={passkeys.isFetching || sessions.isFetching}
+		onretry={() => {
+			passkeys.refetch();
+			sessions.refetch();
+		}}
+	/>
+{/if}
+
 <div class="space-y-8">
 	<Section
 		title="Passkeys"
@@ -136,7 +149,12 @@
 		{#if passkeys.isPending}
 			<ListSkeleton rows={2} />
 		{:else if passkeys.isError && !passkeys.data}
-			<ErrorState error={passkeys.error} onretry={() => passkeys.refetch()} variant="inset" />
+			<ErrorState
+				error={passkeys.error}
+				fetching={passkeys.isFetching}
+				onretry={() => passkeys.refetch()}
+				variant="inset"
+			/>
 		{:else}
 			<List>
 				{#each passkeys.data ?? [] as p (p.id)}
@@ -187,7 +205,12 @@
 		{#if sessions.isPending}
 			<ListSkeleton rows={2} />
 		{:else if sessions.isError && !sessions.data}
-			<ErrorState error={sessions.error} onretry={() => sessions.refetch()} variant="inset" />
+			<ErrorState
+				error={sessions.error}
+				fetching={sessions.isFetching}
+				onretry={() => sessions.refetch()}
+				variant="inset"
+			/>
 		{:else}
 			<List>
 				{#each sessions.data ?? [] as s (s.id)}

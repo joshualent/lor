@@ -40,7 +40,7 @@
 	{#if back}
 		<a
 			href={back.href}
-			class="mb-3 -ml-1.5 inline-flex items-center gap-0.5 rounded-md py-1 pr-2 pl-0.5 text-callout text-muted-foreground no-underline! focus-ring transition-colors hover:text-foreground"
+			class="relative mb-3 -ml-1.5 inline-flex items-center gap-0.5 rounded-md py-1 pr-2 pl-0.5 text-callout text-muted-foreground no-underline! focus-ring transition-colors after:absolute after:-inset-x-1 after:-inset-y-2 after:content-[''] hover:text-foreground"
 		>
 			<ChevronLeft class="size-4" aria-hidden="true" />{back.label}
 		</a>
@@ -52,10 +52,13 @@
 				<h1 class="text-title break-words" aria-label={heading ? title : undefined}>
 					{#if heading}{@render heading()}{:else}{title}{/if}
 				</h1>
-				{#if subtitle}<p class="mt-1 text-callout text-muted-foreground">{subtitle}</p>{/if}
+				{#if subtitle && leading}<p class="mt-1 text-callout text-muted-foreground">
+						{subtitle}
+					</p>{/if}
 			</div>
 		</div>
 		{#if actions}<div class="flex shrink-0 flex-wrap gap-2">{@render actions()}</div>{/if}
 	</div>
+	{#if subtitle && !leading}<p class="mt-1 text-callout text-muted-foreground">{subtitle}</p>{/if}
 	{#if meta}<div class="mt-3 flex flex-wrap items-center gap-2">{@render meta()}</div>{/if}
 </header>

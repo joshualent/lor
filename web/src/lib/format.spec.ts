@@ -6,7 +6,8 @@ import {
 	formatAgo,
 	formatClock,
 	offerChatLine,
-	formatTimeOfDay
+	formatTimeOfDay,
+	clockParts
 } from './format';
 
 describe('formatDuration', () => {
@@ -83,5 +84,19 @@ describe('formatTimeOfDay', () => {
 		const t = formatTimeOfDay(new Date(2026, 9, 26, 14, 5, 59).getTime());
 		expect(t).toMatch(/0?2:05|14:05/);
 		expect(t).not.toMatch(/59/);
+	});
+});
+
+describe('clockParts', () => {
+	const now = new Date(2026, 9, 26, 23, 30).getTime();
+	it('keeps the time together and names the day', () => {
+		const p = clockParts(new Date(2026, 9, 26, 23, 45).getTime(), now);
+		expect(p.day).toBe('Today');
+		expect(p.time).toMatch(/11:45\sPM|23:45/);
+		expect(p.time).not.toContain(p.zone || '§');
+		expect(clockParts(new Date(2026, 9, 27, 0, 45).getTime(), now).day).toBe('Tomorrow');
+		expect(clockParts(new Date(2026, 9, 29, 9, 0).getTime(), now).day).not.toMatch(
+			/Today|Tomorrow/
+		);
 	});
 });

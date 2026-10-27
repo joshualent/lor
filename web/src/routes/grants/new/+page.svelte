@@ -26,6 +26,7 @@
 	import EmptyState from '#lib/components/lor/EmptyState.svelte';
 	import ErrorState from '#lib/components/lor/ErrorState.svelte';
 	import PageSkeleton from '#lib/components/lor/PageSkeleton.svelte';
+	import StaleNotice from '#lib/components/lor/StaleNotice.svelte';
 	import PageHeader from '#lib/components/lor/PageHeader.svelte';
 	import Section from '#lib/components/lor/Section.svelte';
 	import Warnings from '#lib/components/lor/Warnings.svelte';
@@ -124,7 +125,7 @@
 	</div>
 {:else if agents.isPending || hosts.isPending}
 	<PageSkeleton header={false} sections={2} />
-{:else if agents.isError || hosts.isError}
+{:else if (agents.isError && !agents.data) || (hosts.isError && !hosts.data)}
 	<ErrorState
 		variant="inset"
 		error={agents.error ?? hosts.error}
@@ -148,6 +149,17 @@
 		{/snippet}
 	</EmptyState>
 {:else}
+	{#if agents.isError || hosts.isError}
+		<StaleNotice
+			error={agents.error ?? hosts.error}
+			updatedAt={Math.min(agents.dataUpdatedAt, hosts.dataUpdatedAt)}
+			fetching={agents.isFetching || hosts.isFetching}
+			onretry={() => {
+				agents.refetch();
+				hosts.refetch();
+			}}
+		/>
+	{/if}
 	<form onsubmit={submit}>
 		<!-- Locked while the passkey prompt is open: the action is already fixed. -->
 		<fieldset disabled={busy} class="min-w-0 space-y-7">
@@ -216,7 +228,9 @@
 
 			<Section title="Confirm">
 				<Card class="space-y-4">
-					{#if host && agent}
+					{#if host && agent && !durationValid}
+						<p class="text-callout text-muted-foreground">Enter a duration first.</p>
+					{:else if host && agent}
 						<p data-testid="offer-summary" class="text-body">
 							{agent.name} gets
 							<strong class={sudo ? 'text-warning' : ''}
@@ -250,7 +264,7 @@
 						{#if busy}<Spinner />{:else if host && agent}<KeyRound />{:else}<Send />{/if}
 						{busy
 							? 'Waiting for passkey…'
-							: host && agent
+							: host && agent && durationValid
 								? `Grant ${sudo ? 'sudo' : 'standard user'} on ${host.name} for ${formatDuration(duration)}`
 								: 'Grant access'}
 					</Button>

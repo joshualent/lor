@@ -168,11 +168,17 @@
 {#if q.isPending}
 	<PageSkeleton />
 {:else if q.isError && !q.data}
-	<ErrorState error={q.error} onretry={() => q.refetch()} back={{ href: '/', label: 'Home' }} />
+	<ErrorState
+		error={q.error}
+		fetching={q.isFetching}
+		onretry={() => q.refetch()}
+		back={{ href: '/', label: 'Home' }}
+	/>
 {:else if g && host}
 	{#if q.isError && q.data}<StaleNotice
 			error={q.error}
 			updatedAt={q.dataUpdatedAt}
+			fetching={q.isFetching}
 			onretry={() => q.refetch()}
 		/>{/if}
 	<!-- ============================================================ consent view -->
@@ -257,9 +263,13 @@
 						</p>
 					{/if}
 					<p class="mt-3 border-t border-separator pt-3 text-callout text-muted-foreground">
-						Ends <span class="font-medium text-foreground nums"
-							>{formatClock(endsAt, clock.now)}</span
-						> · extendable
+						{#if durationValid}
+							Ends <span class="font-medium text-foreground nums"
+								>{formatClock(endsAt, clock.now)}</span
+							> · extendable
+						{:else}
+							Ends when you enter a duration
+						{/if}
 					</p>
 				</Card>
 			</Section>
@@ -305,7 +315,9 @@
 					{#if busy === 'authorize'}<Spinner />{:else}<KeyRound />{/if}
 					{busy === 'authorize'
 						? 'Waiting for passkey…'
-						: `Authorize ${sudo ? 'sudo' : 'standard user'} on ${g.host.name} for ${formatDuration(duration)}`}
+						: durationValid
+							? `Authorize ${sudo ? 'sudo' : 'standard user'} on ${g.host.name} for ${formatDuration(duration)}`
+							: `Authorize ${sudo ? 'sudo' : 'standard user'} on ${g.host.name}: enter a duration`}
 				</Button>
 			</ActionBar>
 		</article>

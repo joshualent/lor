@@ -6,11 +6,11 @@
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { EXTEND_CHOICES } from '#lib/durations.js';
 	import { errorMessage, isCancel } from '#lib/errors.js';
-	import { clock } from '#lib/clock.svelte.js';
-	import { formatClock, formatDuration } from '#lib/format.js';
+	import { formatDuration } from '#lib/format.js';
 	import { stepUp } from '#lib/webauthn.js';
 	import DurationPicker from './DurationPicker.svelte';
 	import Confirm from './Confirm.svelte';
+	import TimeStack from './TimeStack.svelte';
 
 	let {
 		open = $bindable(false),
@@ -62,15 +62,9 @@
 			<div
 				class="grid grid-cols-[1fr_auto_1fr] items-center gap-x-3 rounded-lg bg-card px-3.5 py-3"
 			>
-				<div>
-					<p class="text-footnote text-muted-foreground">Current end</p>
-					<p class="font-medium nums">{formatClock(Date.parse(end), clock.now)}</p>
-				</div>
+				<TimeStack label="Current end" ms={Date.parse(end)} />
 				<ArrowRight class="size-4 text-icon-muted" aria-label="becomes" />
-				<div>
-					<p class="text-footnote text-muted-foreground">New end</p>
-					<p class="font-medium text-primary nums">{formatClock(newEnd, clock.now)}</p>
-				</div>
+				<TimeStack label="New end" ms={newEnd} accent />
 			</div>
 		{/if}
 	</div>

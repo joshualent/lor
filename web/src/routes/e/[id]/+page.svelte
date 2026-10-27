@@ -8,7 +8,7 @@
 	import { api, call } from '#lib/api/client.js';
 	import { clock } from '#lib/clock.svelte.js';
 	import { errorMessage, isCancel } from '#lib/errors.js';
-	import { formatAgo, formatClock, formatCountdown, formatDuration } from '#lib/format.js';
+	import { formatAgo, formatCountdown, formatDuration } from '#lib/format.js';
 	import { keys, fetchExtension, LIVE_MS } from '#lib/queries.js';
 	import { passkeyName } from '#lib/status.js';
 	import { stepUp } from '#lib/webauthn.js';
@@ -30,6 +30,7 @@
 	import Section from '#lib/components/lor/Section.svelte';
 	import StatusBadge from '#lib/components/lor/StatusBadge.svelte';
 	import StaleNotice from '#lib/components/lor/StaleNotice.svelte';
+	import TimeStack from '#lib/components/lor/TimeStack.svelte';
 	import UnverifiedText from '#lib/components/lor/UnverifiedText.svelte';
 	import Warnings from '#lib/components/lor/Warnings.svelte';
 
@@ -107,12 +108,18 @@
 {#if q.isPending}
 	<PageSkeleton />
 {:else if q.isError && !q.data}
-	<ErrorState error={q.error} onretry={() => q.refetch()} back={{ href: '/', label: 'Home' }} />
+	<ErrorState
+		error={q.error}
+		fetching={q.isFetching}
+		onretry={() => q.refetch()}
+		back={{ href: '/', label: 'Home' }}
+	/>
 {:else if d}
 	{@const g = d.grant}
 	{#if q.isError && q.data}<StaleNotice
 			error={q.error}
 			updatedAt={q.dataUpdatedAt}
+			fetching={q.isFetching}
 			onretry={() => q.refetch()}
 		/>{/if}
 	<article class="space-y-7" data-testid="extension">
@@ -147,19 +154,13 @@
 						class="grid grid-cols-[1fr_auto_1fr] items-center gap-x-3"
 						data-testid="extension-times"
 					>
-						<div>
-							<p class="text-footnote text-muted-foreground">Now ends</p>
-							<p class="text-headline nums">{formatClock(end, clock.now)}</p>
-							<p class="text-footnote text-muted-foreground">
-								{formatCountdown(end, clock.now)} left
-							</p>
-						</div>
+						<TimeStack label="Now ends" ms={end} note="{formatCountdown(end, clock.now)} left" />
 						<ArrowRight class="size-5 text-icon-muted" aria-label="would become" />
-						<div>
-							<p class="text-footnote text-muted-foreground">If approved</p>
-							<p class="text-headline text-primary nums">{formatClock(would, clock.now)}</p>
-							<p class="text-footnote text-muted-foreground">+{formatDuration(duration)}</p>
-						</div>
+						{#if durationValid}
+							<TimeStack label="If approved" ms={would} accent note="+{formatDuration(duration)}" />
+						{:else}
+							<p class="text-callout text-muted-foreground">Enter a duration</p>
+						{/if}
 					</div>
 					<div class="mt-4 border-t border-separator pt-4">
 						<p class="mb-3 text-callout text-muted-foreground">
@@ -187,7 +188,11 @@
 					data-testid="approve-extension"
 				>
 					{#if busy}<Spinner />{:else}<KeyRound />{/if}
-					{busy ? 'Waiting for passkey…' : `Extend ${g.host.name} by ${formatDuration(duration)}`}
+					{busy
+						? 'Waiting for passkey…'
+						: durationValid
+							? `Extend ${g.host.name} by ${formatDuration(duration)}`
+							: `Extend ${g.host.name}: enter a duration`}
 				</Button>
 			</ActionBar>
 		{:else}

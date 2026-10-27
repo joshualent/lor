@@ -189,7 +189,7 @@ export const listRowVariants = tv({
 		meta: 'flex shrink-0 flex-col items-end gap-1 text-right text-footnote text-muted-foreground nums',
 		chevron:
 			'size-4 shrink-0 text-icon-muted transition-transform duration-(--duration-fast) ease-(--ease-standard)',
-		trailing: 'flex shrink-0 items-center gap-1 pr-3'
+		trailing: 'flex shrink-0 items-center gap-3 pr-3'
 	},
 	variants: {
 		interactive: {

@@ -166,12 +166,18 @@
 	{#if agents.isError && agents.data}<StaleNotice
 			error={agents.error}
 			updatedAt={agents.dataUpdatedAt}
+			fetching={agents.isFetching}
 			onretry={() => agents.refetch()}
 		/>{/if}
 	{#if agents.isPending}
 		<ListSkeleton rows={3} />
 	{:else if agents.isError && !agents.data}
-		<ErrorState error={agents.error} onretry={() => agents.refetch()} variant="inset" />
+		<ErrorState
+			error={agents.error}
+			fetching={agents.isFetching}
+			onretry={() => agents.refetch()}
+			variant="inset"
+		/>
 	{:else if agents.data?.length === 0}
 		<EmptyState
 			icon={Bot}

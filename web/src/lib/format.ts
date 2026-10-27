@@ -136,3 +136,41 @@ export function formatArgv(argv: string[]): string {
 export function formatTimeOfDay(ms: number): string {
 	return new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
+
+/**
+ * A clock time split into parts for stacked layouts: the time with AM/PM
+ * kept together, the zone, and the day ("Today", "Tomorrow" or "Oct 27").
+ */
+export function clockParts(
+	ms: number,
+	nowMs: number,
+	timeZone?: string
+): { time: string; zone: string; day: string } {
+	const d = new Date(ms);
+	const parts = new Intl.DateTimeFormat(undefined, {
+		hour: '2-digit',
+		minute: '2-digit',
+		timeZoneName: 'short',
+		timeZone
+	}).formatToParts(d);
+	const zone = parts.find((p) => p.type === 'timeZoneName')?.value ?? '';
+	const time = parts
+		.filter((p) => p.type !== 'timeZoneName')
+		.map((p) => p.value)
+		.join('')
+		.trim();
+	const key = (x: number) =>
+		new Date(x).toLocaleDateString('en-CA', {
+			timeZone,
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit'
+		});
+	const day =
+		key(ms) === key(nowMs)
+			? 'Today'
+			: key(ms) === key(nowMs + 86_400_000)
+				? 'Tomorrow'
+				: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone });
+	return { time, zone, day };
+}

@@ -142,6 +142,7 @@
 {:else if q.isError && !q.data}
 	<ErrorState
 		error={q.error}
+		fetching={q.isFetching}
 		onretry={() => q.refetch()}
 		back={{ href: '/hosts', label: 'All hosts' }}
 	/>
@@ -149,6 +150,7 @@
 	{#if q.isError && q.data}<StaleNotice
 			error={q.error}
 			updatedAt={q.dataUpdatedAt}
+			fetching={q.isFetching}
 			onretry={() => q.refetch()}
 		/>{/if}
 	<PageHeader title={h.name} back={{ href: '/hosts', label: 'Hosts' }}>
