@@ -5,7 +5,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/joshualent/lor/internal/version.Version=$(VERSION)
 BIN     := bin
 
-.PHONY: all generate web web-deps build test test-go test-web e2e integration lint dev clean
+.PHONY: all generate web web-deps build test test-go test-web e2e screens integration lint dev clean
 
 all: build
 
@@ -44,6 +44,12 @@ test-web: web-deps
 ## e2e: Playwright against lor-server --dev (needs: make build; pnpm -C web exec playwright install chromium).
 e2e: build
 	$(PNPM) -C web exec playwright test
+
+## screens: seed realistic data and screenshot every page (desktop + phone) into SCREENS_DIR. Not in CI.
+SCREENS_DIR ?= test/screens/.tmp/out
+screens: build
+	$(GO) build -o $(BIN)/fakessh ./test/e2e/fakessh
+	LOR_SCREENS_DIR=$(abspath $(SCREENS_DIR)) $(PNPM) -C web exec playwright test -c playwright.screens.config.ts
 
 ## integration: real OpenSSH in Docker (DISTRO=debian:12 by default).
 integration: build

@@ -11,3 +11,4 @@ web/test-results/
 web/playwright-report/
 .DS_Store
 web/build/
+/test/screens/.tmp/
