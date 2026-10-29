@@ -143,11 +143,12 @@
 
 <div class="grid items-start gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
 	<div class="min-w-0 space-y-8">
-		<Section
-			title="Passkeys"
-			count={passkeys.data?.length}
-			footnote="Lost every passkey? Run lor-server admin reset on the Lor LXC console."
-		>
+		<Section title="Passkeys" count={passkeys.data?.length}>
+			{#snippet footer()}<p class="text-footnote text-muted-foreground">
+					Lost every passkey? Run <code class="font-mono text-foreground"
+						>lor-server admin reset</code
+					> on the Lor LXC console.
+				</p>{/snippet}
 			{#snippet action()}
 				<Button size="sm" variant="ghost" onclick={() => (addOpen = true)}
 					><Plus /> Add passkey</Button

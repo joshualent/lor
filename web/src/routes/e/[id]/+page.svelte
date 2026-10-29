@@ -224,7 +224,7 @@
 	<Confirm
 		bind:open={denyOpen}
 		title="Deny this extension?"
-		description="The current grant keeps its end time."
+		description={`${g.agent.name} on ${g.host.name} · ${g.level === 'sudo' ? 'sudo (root)' : 'standard user'} · Grant #${g.id} · Extension #${d.extension.id}. The current grant keeps its end time.`}
 	>
 		<div class="space-y-2">
 			<Label for="ext-note">Note (optional)</Label>

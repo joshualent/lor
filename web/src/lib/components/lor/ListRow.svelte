@@ -47,7 +47,7 @@
 		density?: 'default' | 'compact' | 'relaxed';
 		/** Put metadata below the text on phones, for long addresses or summaries. */
 		stackMeta?: boolean;
-		/** Hide decorative leading tiles and tighten layout below 400px. */
+		/** Hide decorative leading tiles and tighten layout below 360px. */
 		compactOnNarrow?: boolean;
 		tone?: 'default' | 'danger' | 'accent';
 		disabled?: boolean;

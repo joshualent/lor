@@ -333,6 +333,13 @@ test('screens', async () => {
 		}
 	});
 	await shoot('extension', `/e/${ids.ext}`);
+	await shoot('extension-deny', `/e/${ids.ext}`, {
+		fullPage: false,
+		prepare: async (p) => {
+			await p.getByRole('button', { name: 'Deny', exact: true }).first().click();
+			await expect(p.getByText(new RegExp(`Grant #${ids.media} · Extension #${ids.ext}`))).toBeVisible();
+		}
+	});
 	await shoot('grant-active-sudo', `/grants/${ids.nas}`);
 	await shoot('grant-active-user', `/grants/${ids.media}`);
 	await shoot('grant-expiring', `/grants/${ids.nasUser}`);

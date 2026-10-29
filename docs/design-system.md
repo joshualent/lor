@@ -283,10 +283,16 @@ Don't:
 - Narrow audit and host rows stack metadata; long description values can
   use the responsive layout. Selected segments include an accent marker.
 
-- Pending-request and audit rows use a compact layout below 400 px, preserving
+- Pending-request and audit rows use a compact layout below 360 px, preserving
   identity, risk labels, timestamps and 44 px targets while hiding decorative
-  leading tiles. Audit offers a return-to-filters link when the toolbar is
-  out of view, and repeats paused-history controls near the toolbar.
+  leading tiles. Compact audit rows keep a coloured dot beside their event
+  label; regular phones retain the full icon. Expanded compact details use
+  the full row width.
+- Audit displays at most 25 events per page, buffering the server’s unchanged
+  100-event responses. In-flow Newer/Older controls appear above and below
+  the list; the footer links to filters. History pauses updates and provides
+  Back to latest. Paging and resetting focus the top pager and scroll it into
+  view. Pending responses remain guarded against filter changes and resets.
 - Consent provides Read full reason from its header. Compact windows also
   have Go to decision after the choices. These links focus their destination;
   they do not alter the selected access or acknowledgement.

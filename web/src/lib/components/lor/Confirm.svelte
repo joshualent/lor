@@ -70,7 +70,9 @@
 		<Drawer.Content class="max-h-[90dvh]">
 			<!-- Header and footer stay put; only the body scrolls. -->
 			<div class="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col px-4">
-				<Drawer.Header class="shrink-0 px-0 pt-5 text-left">
+				<Drawer.Header
+					class="shrink-0 px-0 pt-5 text-left group-data-[vaul-drawer-direction=bottom]/drawer-content:text-left group-data-[vaul-drawer-direction=top]/drawer-content:text-left"
+				>
 					<Drawer.Title>{title}</Drawer.Title>
 					{#if description}<Drawer.Description>{description}</Drawer.Description>{/if}
 				</Drawer.Header>

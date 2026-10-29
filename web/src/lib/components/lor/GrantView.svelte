@@ -204,7 +204,9 @@
 					<span class="text-footnote text-muted-foreground"
 						>Request #{g.id} · {formatAgo(Date.parse(g.requested_at), clock.now)}</span
 					>
-					<Button href="#agent-reason" variant="link" size="sm">Read full reason</Button>
+					<Button href="#agent-reason" variant="secondary" class="min-h-11 text-footnote"
+						>Read full reason</Button
+					>
 					<div
 						class="flex w-full items-center justify-between gap-3 border-t border-separator pt-2 text-callout"
 					>
@@ -525,7 +527,7 @@
 		title="Deny this request?"
 		description="The agent is told it was denied. You can add a note."
 	>
-		<p class="text-callout">
+		<p class="mb-4 text-callout">
 			{g.agent.name} on {g.host.name} · {g.requested_level === 'sudo'
 				? 'sudo (root)'
 				: 'standard user'} · Request #{g.id}
@@ -550,7 +552,7 @@
 		title={g.status === 'offered' ? 'Withdraw this offer?' : `Revoke access to ${g.host.name}?`}
 		description={g.status === 'offered' ? WITHDRAW_NOTE : REVOKE_NOTE}
 	>
-		<p class="text-callout">
+		<p class="mb-4 text-callout">
 			{g.agent.name} on {g.host.name} · {g.level === 'sudo' ? 'sudo (root)' : 'standard user'} · Grant
 			#{g.id}
 		</p>

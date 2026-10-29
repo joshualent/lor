@@ -159,15 +159,67 @@ same screenshot evidence.
 Round 4 evidence: `round-4/`, 112 screenshots, including long-reason start/end
 views, compact decision jumps, and phone audit-history controls. The full
 suite passes 170 frontend tests, 21 production E2E tests and eight screenshot
-tests. Round 4 council scoring is pending.
+tests.
+
+## Round 4 scores
+
+| Category | Sol | Terra | Opus 5.5 |
+|---|---:|---:|---:|
+| Usability | 8 | 8 | 8 |
+| Visual Hierarchy | 9 | 8 | 8 |
+| Consistency | 8 | 9 | 7 |
+| Responsiveness | 8 | 8 | 8 |
+| Clarity | 8 | 8 | 8 |
+| Efficiency | 8 | 7 | 8 |
+| Learnability | 8 | 8 | 8 |
+| Layout & Composition | 9 | 8 | 8 |
+| Typography | 8 | 8 | 8 |
+| Color theory & contrast | 9 | 8 | 8 |
+| Whitespace | 8 | 8 | 8 |
+| Perceived performance | 8 | 8 | 8 |
+| Accessibility | 8 | 8 | 8 |
+
+Sol passed all categories. Terra requested less scrolling through audit
+history; Opus requested consistent phone status cues. Both identified the
+floating return-to-filters shortcut overlapping the pagination action at
+320 px. These findings prevent completion at this round.
+
+## Changes for round 5
+
+- Audit shows 25 events per page with Newer/Older controls both above and
+  below the list, while buffering the existing 100-event API responses.
+  Page ranges are explicit, the whole browsing snapshot pauses updates until
+  Back to latest, and page changes and
+  Back to latest restore focus and position at the top pager. The footer
+  return-to-filters link is in flow, with no floating control to cover taps.
+- Pending history results still require the current generation/filter.
+  Regression coverage exercises resets during delayed success/failure,
+  cached Newer/Older navigation, retries with the same cursor, final partial
+  pages, keyboard activation, and unobscured 44 px footer controls on phones.
+- Full outcome icons remain on regular phones; the compact layout applies
+  only below 360 px and retains a coloured audit cue and complete identity.
+  Expanded compact details use the available width.
+- Read full reason has a stronger button affordance. Confirmation summaries
+  have more space, drawer headings align with fields, extension denial names
+  its host/agent/level/grant/extension, and the recovery command is monospace.
+
+Round 5 evidence: `round-5/`, 122 screenshots, including phone pagination
+loading, retry, history, final partial page and frozen first-page states.
+Fresh independent council scoring is pending. Final verification uses a
+single rebuilt production bundle. An overlapping build/test run had a
+transient gallery-check failure; no UI changes were needed for the full
+rerun to pass. `make test` and `make build` both regenerate the SPA and
+should run sequentially.
 
 
 ## Validation
 
 - `make test`: Go vet/tests, Svelte checks, lint, and 170 Vitest tests pass.
-- `make e2e`: 21 tests pass against the production build, including failed
+- `make e2e`: 22 tests pass against the production build, including failed
   sign-out/revoke-all, agent disable confirmation/failure, inventory filters,
   responsive navigation and overflow at 320–1440 px, and confirmation action
-  visibility in short desktop and phone windows.
+  visibility in short desktop and phone windows. Audit cases also cover
+  bounded pages, frozen history, keyboard retry, cursor continuity, delayed
+  responses, focus recovery and unobscured 44 px phone pagination controls.
 - `make screens`: all eight seeded screenshot tests pass; responsive
   checkpoints also assert no horizontal page overflow.

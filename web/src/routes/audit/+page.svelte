@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { parseGrantFilter } from '#lib/grant-filter.js';
-	import ArrowUp from '@lucide/svelte/icons/arrow-up';
+	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+	import ChevronRight from '@lucide/svelte/icons/chevron-right';
+	import { onDestroy, tick } from 'svelte';
 	import ScrollText from '@lucide/svelte/icons/scroll-text';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -27,6 +29,9 @@
 	import StaleNotice from '#lib/components/lor/StaleNotice.svelte';
 
 	const PAGE = 100;
+	const VIEW_PAGE = 25;
+	let pageIndex = $state(0);
+	let historyActive = $state(false);
 
 	let actor = $state(page.url.searchParams.get('actor') ?? '');
 	let action = $state(page.url.searchParams.get('action') ?? '');
@@ -46,6 +51,9 @@
 
 	const grantFilter = $derived(parseGrantFilter(grantQuery));
 	let historyGeneration = 0;
+	onDestroy(() => {
+		historyGeneration++;
+	});
 	const filter = $derived({
 		actor: actor || undefined,
 		action: action.trim() || undefined,
@@ -54,13 +62,15 @@
 	const q = createQuery(() => ({
 		queryKey: keys.audit(filter),
 		queryFn: () => fetchAudit(filter),
-		refetchInterval: loadingMore || older.length > 0 ? false : 15_000,
-		refetchOnWindowFocus: !loadingMore && older.length === 0,
+		refetchInterval: loadingMore || historyActive ? false : 15_000,
+		refetchOnWindowFocus: !loadingMore && !historyActive,
 		placeholderData: keepPreviousData,
 		enabled: !grantFilter.error
 	}));
 	function resetHistory() {
 		historyGeneration++;
+		pageIndex = 0;
+		historyActive = false;
 		older = [];
 		olderDone = false;
 		loadingMore = false;
@@ -70,24 +80,25 @@
 		void filter;
 		resetHistory();
 	});
+	async function focusPages(revision = historyGeneration) {
+		await tick();
+		if (revision !== historyGeneration) return;
+		const target = document.getElementById('audit-page-navigation');
+		target?.focus({ preventScroll: true });
+		target?.scrollIntoView({ block: 'start' });
+	}
 	function backToLatest() {
 		resetHistory();
 		void q.refetch();
+		void focusPages();
 	}
-
-	let filtersElement = $state<HTMLDivElement | null>(null);
-	let filtersVisible = $state(true);
-	$effect(() => {
-		if (!filtersElement) return;
-		const observer = new IntersectionObserver(
-			([entry]) => {
-				filtersVisible = entry.isIntersecting;
-			},
-			{ rootMargin: '-80px 0px 0px 0px' }
-		);
-		observer.observe(filtersElement);
-		return () => observer.disconnect();
-	});
+	function newerPage() {
+		moreError = null;
+		if (pageIndex > 0) {
+			pageIndex--;
+			void focusPages();
+		}
+	}
 
 	// Keep the filters in the URL, so a filtered log can be shared or reloaded.
 	$effect(() => {
@@ -102,13 +113,16 @@
 
 	const names = useNames();
 
-	const events = $derived([...(q.data ?? []), ...older]);
+	const allEvents = $derived([...(q.data ?? []), ...older]);
+	const events = $derived(allEvents.slice(pageIndex * VIEW_PAGE, (pageIndex + 1) * VIEW_PAGE));
 	const groups = $derived(groupByDay(events, clock.now));
 	const hasMore = $derived(
 		!q.isPlaceholderData &&
 			!olderDone &&
 			(older.length ? older.length % PAGE === 0 : (q.data?.length ?? 0) >= PAGE)
 	);
+	const canGoOlder = $derived((pageIndex + 1) * VIEW_PAGE < allEvents.length || hasMore);
+	const pagingBusy = $derived(loadingMore || q.isFetching || q.isPlaceholderData);
 	const filtered = $derived(!!(filter.actor || filter.action || grant.trim()));
 
 	// The category chips, plus the current prefix if it came from a link.
@@ -118,9 +132,17 @@
 			: [...CATEGORY_FILTERS, { label: action, prefix: action }]
 	);
 
-	async function more() {
-		const last = events.at(-1);
-		if (!last || loadingMore || q.isFetching || q.isPlaceholderData || grantFilter.error) return;
+	async function olderPage() {
+		if (pagingBusy || grantFilter.error) return;
+		historyActive = true;
+		if ((pageIndex + 1) * VIEW_PAGE < allEvents.length) {
+			moreError = null;
+			pageIndex++;
+			void focusPages();
+			return;
+		}
+		const last = allEvents.at(-1);
+		if (!last || !hasMore) return;
 		const revision = historyGeneration;
 		const initiatingFilter = { ...filter };
 		loadingMore = true;
@@ -134,6 +156,10 @@
 				return;
 			if (next.length < PAGE) olderDone = true;
 			older = [...older, ...next];
+			if (next.length) {
+				pageIndex++;
+				void focusPages(revision);
+			}
 		} catch (e) {
 			if (revision === historyGeneration) moreError = e;
 		} finally {
@@ -158,65 +184,52 @@
 			>{/if}{/snippet}
 </PageHeader>
 
-<div bind:this={filtersElement}>
-	<Toolbar id="audit-filters" label="Filters">
-		<div class="space-y-2">
-			<p class="text-footnote text-muted-foreground">Who</p>
-			<SegmentedControl
-				label="Who"
-				bind:value={actor}
-				options={ACTOR_FILTERS.map((f) => ({ value: f.value, label: f.label }))}
-				class="w-full sm:w-auto"
-				fill
+<Toolbar id="audit-filters" label="Filters">
+	<div class="space-y-2">
+		<p class="text-footnote text-muted-foreground">Who</p>
+		<SegmentedControl
+			label="Who"
+			bind:value={actor}
+			options={ACTOR_FILTERS.map((f) => ({ value: f.value, label: f.label }))}
+			class="w-full sm:w-auto"
+			fill
+		/>
+	</div>
+	<div
+		class="grid grid-cols-[minmax(0,1fr)_7.5rem] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]"
+	>
+		<div class="min-w-0 space-y-2">
+			<label for="audit-category" class="block text-footnote text-muted-foreground sm:hidden"
+				>Category</label
+			>
+			<p class="hidden text-footnote text-muted-foreground sm:block">Category</p>
+			<NativeSelect id="audit-category" bind:value={action} class="sm:hidden"
+				>{#each categories as c (c.prefix)}<option value={c.prefix}
+						>{c.prefix ? c.label : 'All categories'}</option
+					>{/each}</NativeSelect
+			>
+			<ChipGroup
+				label="Category"
+				bind:value={action}
+				options={categories.map((c) => ({ value: c.prefix, label: c.label }))}
+				class="hidden sm:flex"
 			/>
 		</div>
-		<div
-			class="grid grid-cols-[minmax(0,1fr)_7.5rem] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]"
-		>
-			<div class="min-w-0 space-y-2">
-				<label for="audit-category" class="block text-footnote text-muted-foreground sm:hidden"
-					>Category</label
-				>
-				<p class="hidden text-footnote text-muted-foreground sm:block">Category</p>
-				<NativeSelect id="audit-category" bind:value={action} class="sm:hidden"
-					>{#each categories as c (c.prefix)}<option value={c.prefix}
-							>{c.prefix ? c.label : 'All categories'}</option
-						>{/each}</NativeSelect
-				>
-				<ChipGroup
-					label="Category"
-					bind:value={action}
-					options={categories.map((c) => ({ value: c.prefix, label: c.label }))}
-					class="hidden sm:flex"
-				/>
-			</div>
-			<div class="space-y-2">
-				<label for="audit-grant-number" class="block text-footnote text-muted-foreground"
-					>Grant number</label
-				><SearchField
-					bind:value={grant}
-					id="audit-grant-number"
-					aria-invalid={!!grantFilter.error}
-					aria-describedby={grantFilter.error ? 'audit-grant-error' : undefined}
-					label="Grant number"
-					placeholder="Grant #"
-					inputmode="numeric"
-				/>
-			</div>
+		<div class="space-y-2">
+			<label for="audit-grant-number" class="block text-footnote text-muted-foreground"
+				>Grant number</label
+			><SearchField
+				bind:value={grant}
+				id="audit-grant-number"
+				aria-invalid={!!grantFilter.error}
+				aria-describedby={grantFilter.error ? 'audit-grant-error' : undefined}
+				label="Grant number"
+				placeholder="Grant #"
+				inputmode="numeric"
+			/>
 		</div>
-	</Toolbar>
-</div>
-{#if older.length > 0}<div
-		role="group"
-		aria-label="Audit history controls"
-		class="mb-4 flex flex-wrap items-center justify-between gap-x-3 text-footnote text-muted-foreground"
-	>
-		<span>Live updates paused while viewing older events.</span><Button
-			variant="link"
-			size="sm"
-			onclick={backToLatest}>Back to latest</Button
-		>
-	</div>{/if}
+	</div>
+</Toolbar>
 {#if grantFilter.error}<p
 		id="audit-grant-error"
 		role="alert"
@@ -229,17 +242,81 @@
 		error={q.error}
 		updatedAt={q.dataUpdatedAt}
 		fetching={q.isFetching}
-		onretry={() => q.refetch()}
+		onretry={backToLatest}
 	/>{/if}
 
-{#if q.isPlaceholderData && !grantFilter.error}<p
-		role="status"
-		class="mb-4 flex items-center gap-2 text-footnote text-muted-foreground"
+<div role="status" aria-live="polite">
+	{#if q.isPlaceholderData && !grantFilter.error}<p
+			class="mb-4 flex items-center gap-2 text-footnote text-muted-foreground"
+		>
+			<Spinner class="size-3.5" /> Updating results… {allEvents.length
+				? 'Previous results are shown below.'
+				: 'Loading matching events.'}
+		</p>{/if}
+</div>
+
+{#snippet pagination(footer = false)}
+	<nav
+		id={footer ? undefined : 'audit-page-navigation'}
+		tabindex="-1"
+		aria-label={footer ? 'Audit pages footer' : 'Audit pages'}
+		aria-busy={loadingMore}
+		class="scroll-mt-24 space-y-1 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
 	>
-		<Spinner class="size-3.5" /> Updating results… {events.length
-			? 'Previous results are shown below.'
-			: 'Loading matching events.'}
-	</p>{/if}
+		<div class="flex items-center justify-between gap-1">
+			<Button
+				variant="secondary"
+				class="min-h-11 gap-1 px-3 text-footnote"
+				aria-label="Newer events"
+				disabled={pageIndex === 0 || pagingBusy}
+				onclick={newerPage}
+			>
+				<ChevronLeft class="size-3.5" /> Newer
+			</Button>
+			<span
+				class="min-w-0 text-center text-footnote wrap-anywhere text-muted-foreground nums"
+				aria-live={footer ? 'off' : 'polite'}
+			>
+				Events {pageIndex * VIEW_PAGE + 1}–{pageIndex * VIEW_PAGE + events.length}
+			</span>
+			<Button
+				variant="secondary"
+				class="min-h-11 gap-1 px-3 text-footnote"
+				aria-label="Older events"
+				disabled={!canGoOlder || pagingBusy}
+				onclick={olderPage}
+			>
+				Older {#if loadingMore}<Spinner class="size-3.5" />{:else}<ChevronRight
+						class="size-3.5"
+					/>{/if}
+			</Button>
+		</div>
+		{#if historyActive || footer}
+			<div
+				class="flex flex-wrap items-center justify-between gap-x-3 text-footnote text-muted-foreground"
+			>
+				{#if footer}<Button href="#audit-filters" variant="link" class="min-h-11 text-footnote"
+						>Back to filters</Button
+					>
+				{:else}<span>Live updates paused</span>{/if}
+				{#if historyActive}<Button
+						variant="link"
+						class="min-h-11 text-footnote"
+						onclick={backToLatest}>Back to latest</Button
+					>{/if}
+			</div>
+		{/if}
+		{#if moreError}
+			<p class="text-footnote text-destructive" role={footer ? undefined : 'alert'}>
+				Couldn't load older events: {errorMessage(moreError)} Select Older to try again.
+			</p>
+		{/if}
+		{#if footer && !canGoOlder && !q.isPlaceholderData}
+			<p class="text-center text-footnote text-muted-foreground">End of recorded history.</p>
+		{/if}
+	</nav>
+{/snippet}
+
 {#if grantFilter.error}
 	<EmptyState
 		title="Enter a valid grant number"
@@ -269,6 +346,7 @@
 		{/snippet}
 	</EmptyState>
 {:else}
+	<div class="mb-5">{@render pagination()}</div>
 	<div class="space-y-6" data-testid="audit-log" aria-busy={q.isPlaceholderData}>
 		{#each groups as group (group.key)}
 			<Section title={group.label} count={group.events.length}>
@@ -279,39 +357,6 @@
 				</List>
 			</Section>
 		{/each}
-		{#if older.length > 0}<div
-				class="flex flex-wrap items-center justify-center gap-x-3 text-footnote text-muted-foreground"
-			>
-				<span>Live updates paused while viewing older events.</span><Button
-					variant="link"
-					size="sm"
-					onclick={backToLatest}>Back to latest</Button
-				>
-			</div>{/if}
-		{#if moreError}
-			<p class="text-center text-footnote text-destructive" role="alert">
-				Couldn't load older events: {errorMessage(moreError)}
-			</p>
-		{/if}
-		{#if hasMore}
-			<Button
-				variant="secondary"
-				class="w-full"
-				disabled={loadingMore || q.isFetching}
-				onclick={more}
-			>
-				{#if loadingMore}<Spinner />{/if}{moreError ? 'Try again' : 'Load older events'}
-			</Button>
-		{:else if !q.isPlaceholderData}
-			<p class="text-center text-footnote text-muted-foreground">That's everything.</p>
-		{/if}
+		{@render pagination(true)}
 	</div>
 {/if}
-
-{#if !filtersVisible}<div
-		class="pointer-events-none fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-20 sm:right-6"
-	>
-		<Button href="#audit-filters" variant="secondary" class="pointer-events-auto border-border"
-			><ArrowUp /> Back to filters</Button
-		>
-	</div>{/if}

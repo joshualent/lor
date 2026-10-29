@@ -319,6 +319,27 @@ test('audit validates grant numbers instead of silently showing all events', asy
 	await expect(page.getByTestId('audit-log')).toBeVisible();
 });
 
+async function olderAuditPages(count: number) {
+	for (let i = 0; i < count; i++) {
+		await page.getByRole('navigation', { name: 'Audit pages', exact: true }).getByRole('button', { name: 'Older events', exact: true }).click();
+	}
+}
+
+async function auditFooterIsUnobscured() {
+	const footer = page.getByRole('navigation', { name: 'Audit pages footer', exact: true });
+	await footer.scrollIntoViewIfNeeded();
+	for (const control of await footer.locator('button, a').all()) {
+		const box = await control.boundingBox();
+		expect(box!.height).toBeGreaterThanOrEqual(44);
+		await expect(control).toBeInViewport();
+		if (await control.isDisabled()) continue;
+		expect(await control.evaluate((el) => {
+			const r = el.getBoundingClientRect();
+			return [0.15, 0.5, 0.85].every((x) => el.contains(document.elementFromPoint(r.left + r.width * x, r.top + r.height / 2)));
+		})).toBe(true);
+	}
+}
+
 test('older audit responses are discarded when their filter changes', async () => {
 	const seed = await (await page.request.get('/api/admin/v1/audit')).json();
 	const template = seed.events[0];
@@ -340,7 +361,7 @@ test('older audit responses are discarded when their filter changes', async () =
 		}
 	});
 	await page.goto('/audit');
-	await page.getByRole('button', { name: 'Load older events', exact: true }).click();
+	await olderAuditPages(4);
 	await olderReady;
 	await page.getByRole('radio', { name: 'Hosts', exact: true }).click();
 	await expect(page.locator('[data-action="host.created"]')).toHaveCount(1);
@@ -377,13 +398,13 @@ test('audit does not show empty or completion claims while filters update', asyn
 	await page.getByRole('searchbox', { name: 'Grant number' }).fill('');
 	await expect(page.getByText(/Updating results/)).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'No matching events' })).toHaveCount(0);
-	await expect(page.getByText("That's everything.")).toHaveCount(0);
+	await expect(page.getByText('End of recorded history.')).toHaveCount(0);
 	await page.screenshot({ path: join(shots, 'audit-updating-from-empty-desktop.png') });
 	releaseAll();
 	await expect(page.locator('[data-action="grant.requested"]')).toHaveCount(1);
 	await page.getByRole('radio', { name: 'Hosts', exact: true }).click();
 	await expect(page.getByText(/Updating results/)).toBeVisible();
-	await expect(page.getByText("That's everything.")).toHaveCount(0);
+	await expect(page.getByText('End of recorded history.')).toHaveCount(0);
 	await page.screenshot({ path: join(shots, 'audit-updating-retained-desktop.png') });
 	releaseHosts();
 	await expect(page.locator('[data-action="host.created"]')).toHaveCount(1);
@@ -422,29 +443,36 @@ for (const outcome of ['success', 'failure'] as const) {
 		});
 		try {
 			await page.goto('/audit');
-			await page.getByRole('button', { name: 'Load older events', exact: true }).click();
-			await expect(page.locator('[data-action="agent.created"]')).toHaveCount(100);
+			await olderAuditPages(4);
+			await expect(page.locator('[data-action="agent.created"]')).toHaveCount(25);
 			const viewport = outcome === 'success' ? { width: 320, height: 568 } : { width: 390, height: 844 };
 			await page.setViewportSize(viewport);
-			await page.getByRole('button', { name: 'Load older events', exact: true }).click();
+			await olderAuditPages(4);
 			await ready;
-			await page.screenshot({ path: join(shots, `audit-return-filters-${viewport.width}.png`) });
-			await page.getByRole('link', { name: 'Back to filters', exact: true }).click();
+			await auditFooterIsUnobscured();
+			await page.screenshot({ path: join(shots, `audit-pagination-loading-${viewport.width}.png`) });
+			const footer = page.getByRole('navigation', { name: 'Audit pages footer', exact: true });
+			await footer.getByRole('link', { name: 'Back to filters', exact: true }).click();
 			await expect(page.getByRole('group', { name: 'Filters', exact: true })).toBeFocused();
-			const controls = page.getByRole('group', { name: 'Audit history controls', exact: true });
-			await expect(controls).toBeVisible();
+			const controls = page.getByRole('navigation', { name: 'Audit pages', exact: true });
+			await expect(controls.getByText('Live updates paused', { exact: true })).toBeVisible();
+			await controls.scrollIntoViewIfNeeded();
 			await page.screenshot({ path: join(shots, `audit-history-paused-${viewport.width}.png`) });
-			await controls.getByRole('button', { name: 'Back to latest', exact: true }).click();
-			await expect(page.locator('[data-action="host.created"]')).toHaveCount(100);
+			// Exercise the footer reset: it must recover both position and focus.
+			await footer.getByRole('button', { name: 'Back to latest', exact: true }).click();
+			await expect(page.locator('[data-action="host.created"]')).toHaveCount(25);
+			await expect(controls).toBeFocused();
+			await expect(controls).toBeInViewport();
+			await expect(controls.getByText('Events 1–25')).toBeVisible();
 			const response = page.waitForResponse((r) => new URL(r.url()).searchParams.get('before') === '801');
 			release();
 			await (await response).finished();
 			await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
 			await expect(page.locator('[data-action="agent.disabled"], [data-action="agent.created"]')).toHaveCount(0);
 			await expect(page.getByText(/Obsolete history request/)).toHaveCount(0);
-			await expect(controls).toHaveCount(0);
-			await page.getByRole('button', { name: 'Load older events', exact: true }).click();
-			await expect(page.locator('[data-action="grant.extended"]')).toHaveCount(100);
+			await expect(controls.getByText('Live updates paused', { exact: true })).toHaveCount(0);
+			await olderAuditPages(4);
+			await expect(page.locator('[data-action="grant.extended"]')).toHaveCount(25);
 			expect(resumedCursor).toBe('1001');
 		} finally {
 			release();
@@ -453,3 +481,76 @@ for (const outcome of ['success', 'failure'] as const) {
 		}
 	});
 }
+
+
+test('phone audit pages stay bounded, navigate cached history and retry without skipping', async () => {
+	const seed = await (await page.request.get('/api/admin/v1/audit')).json();
+	const template = seed.events[0];
+	for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+		let reads = 0;
+		let attempts = 0;
+		const cursors: string[] = [];
+		await page.route('**/api/admin/v1/audit*', async (route) => {
+			const cursor = new URL(route.request().url()).searchParams.get('before');
+			if (cursor) {
+				cursors.push(cursor);
+				attempts++;
+				await route.fulfill(attempts === 1
+					? { status: 500, json: { error: { code: 'test', message: 'Temporary history failure' } } }
+					: { json: { events: Array.from({ length: 3 }, (_, i) => ({ ...template, id: 900 - i, action: 'agent.disabled' })) } });
+			} else {
+				reads++;
+				await route.fulfill({ json: { events: Array.from({ length: 100 }, (_, i) => ({ ...template, id: 1000 - i, action: 'grant.requested' })) } });
+			}
+		});
+		try {
+			await page.setViewportSize(viewport);
+			await page.goto('/audit');
+			const top = page.getByRole('navigation', { name: 'Audit pages', exact: true });
+			const footer = page.getByRole('navigation', { name: 'Audit pages footer', exact: true });
+			await expect(page.locator('[data-action]')).toHaveCount(25);
+			await expect(top.getByRole('button', { name: 'Newer events', exact: true })).toBeDisabled();
+			await olderAuditPages(3);
+			await expect(top.getByText('Events 76–100')).toBeVisible();
+			await expect(top).toBeFocused();
+			await top.getByRole('button', { name: 'Newer events', exact: true }).click();
+			await expect(top.getByText('Events 51–75')).toBeVisible();
+			expect(reads).toBe(1);
+			expect(cursors).toEqual([]);
+			await olderAuditPages(2);
+			await expect(top.getByText(/Temporary history failure/)).toBeVisible();
+			await expect(top.getByText('Events 76–100')).toBeVisible();
+			await expect(page.locator('[data-action]')).toHaveCount(25);
+			await auditFooterIsUnobscured();
+			await page.screenshot({ path: join(shots, `audit-pagination-error-${viewport.width}.png`) });
+			await footer.getByRole('button', { name: 'Older events', exact: true }).focus();
+			await page.keyboard.press('Enter');
+			await expect(top.getByText('Events 101–103')).toBeVisible();
+			await expect(top).toBeFocused();
+			await expect(page.locator('[data-action="agent.disabled"]')).toHaveCount(3);
+			await expect(top.getByRole('button', { name: 'Older events', exact: true })).toBeDisabled();
+			expect(cursors).toEqual(['901', '901']);
+			await page.screenshot({ path: join(shots, `audit-pagination-history-${viewport.width}.png`) });
+			await auditFooterIsUnobscured();
+			await page.screenshot({ path: join(shots, `audit-pagination-end-${viewport.width}.png`) });
+			await footer.getByRole('button', { name: 'Newer events', exact: true }).click();
+			await expect(top.getByText('Events 76–100')).toBeVisible();
+			await expect(top).toBeFocused();
+			await expect(page.locator('[data-action="grant.requested"]')).toHaveCount(25);
+			await expect(page.locator('[data-action="agent.disabled"]')).toHaveCount(0);
+			expect(reads).toBe(1);
+			for (let i = 0; i < 3; i++) await top.getByRole('button', { name: 'Newer events', exact: true }).click();
+			await expect(top.getByText('Events 1–25')).toBeVisible();
+			await expect(top.getByText('Live updates paused', { exact: true })).toBeVisible();
+			expect(reads).toBe(1); // Browsing a snapshot never silently refreshes one part of it.
+			await page.screenshot({ path: join(shots, `audit-pagination-snapshot-${viewport.width}.png`) });
+			await top.getByRole('button', { name: 'Back to latest', exact: true }).click();
+			await expect(top.getByText('Live updates paused', { exact: true })).toHaveCount(0);
+			await expect.poll(() => reads).toBe(2);
+			expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+		} finally {
+			await page.unroute('**/api/admin/v1/audit*');
+		}
+	}
+	await page.setViewportSize({ width: 1280, height: 800 });
+});

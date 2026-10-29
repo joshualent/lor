@@ -202,11 +202,11 @@ export const listRowVariants = tv({
 		},
 		compactOnNarrow: {
 			true: {
-				main: 'max-[399px]:grid max-[399px]:grid-cols-[minmax(0,1fr)_auto] max-[399px]:gap-x-2 max-[399px]:gap-y-0.5 max-[399px]:px-3 max-[399px]:py-2 max-[399px]:min-h-11',
-				leading: 'max-[399px]:hidden',
-				content: 'max-[399px]:col-start-1 max-[399px]:row-start-1',
-				meta: 'max-[399px]:col-start-1 max-[399px]:row-start-2',
-				chevron: 'max-[399px]:col-start-2 max-[399px]:row-start-1 max-[399px]:row-span-2'
+				main: 'max-[359px]:grid max-[359px]:grid-cols-[minmax(0,1fr)_auto] max-[359px]:gap-x-2 max-[359px]:gap-y-0.5 max-[359px]:px-3 max-[359px]:py-2 max-[359px]:min-h-11',
+				leading: 'max-[359px]:hidden',
+				content: 'max-[359px]:col-start-1 max-[359px]:row-start-1',
+				meta: 'max-[359px]:col-start-1 max-[359px]:row-start-2',
+				chevron: 'max-[359px]:col-start-2 max-[359px]:row-start-1 max-[359px]:row-span-2'
 			},
 			false: {}
 		},

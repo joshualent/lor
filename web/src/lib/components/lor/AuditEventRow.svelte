@@ -11,6 +11,7 @@
 	import { formatAgo, formatTimeOfDay, formatTimestamp } from '#lib/format.js';
 	import IconTile from './IconTile.svelte';
 	import ListRow from './ListRow.svelte';
+	import StatusDot from './StatusDot.svelte';
 
 	let {
 		event: ev,
@@ -58,7 +59,9 @@
 >
 	{#snippet leading()}<IconTile icon={look.icon} tone={look.tone} size="sm" />{/snippet}
 	{#snippet titleContent()}
-		<span class="text-callout font-medium">{look.label}</span>
+		<span class="inline-flex items-center gap-2 text-callout font-medium"
+			><StatusDot tone={look.tone} class="min-[360px]:hidden" />{look.label}</span
+		>
 	{/snippet}
 	{#snippet subtitleContent()}<span class="text-footnote">{subtitle}</span>{/snippet}
 	{#snippet metaContent()}
@@ -67,14 +70,16 @@
 		>
 	{/snippet}
 	{#if expandable && open}
-		<div id={regionId} class="px-4 pb-3 pl-14">
+		<div id={regionId} class="px-4 pb-3 max-[359px]:px-3 min-[360px]:pl-14">
 			<div class="space-y-1.5 rounded-lg bg-muted px-3 py-2.5">
 				<p class="flex flex-wrap justify-between gap-x-3 text-caption text-muted-foreground">
 					<span class="font-mono">{ev.action}</span>
 					<time datetime={ev.ts} class="nums">{formatTimestamp(ms)}</time>
 				</p>
 				{#if details.length}
-					<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-footnote">
+					<dl
+						class="grid grid-cols-1 gap-x-3 gap-y-1 text-footnote min-[360px]:grid-cols-[auto_1fr]"
+					>
 						{#each details as [k, v] (k)}
 							<dt class="text-muted-foreground">{k}</dt>
 							<dd class="min-w-0 font-mono wrap-anywhere text-foreground">{v}</dd>
