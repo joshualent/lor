@@ -264,10 +264,39 @@ to normalize the whitespace in the new identity paragraph; the rendered
 identity was correct. Fresh independent council scoring is pending.
 
 
+## Round 6 result and changes for round 7
+
+Terra rated 12 categories at 8, with Perceived performance at 7. Its image
+inspection identified that both loading-dashboard PNGs were blank. The
+capture used an arbitrary delay after reload and did not establish that the
+SPA or its skeleton had rendered. This was an evidence failure, without
+proof of a particular blank duration. Terra also requested visible end text
+at the focused top pager. The other two reviews were stopped when this
+round was superseded; their scores are not treated as completed verdicts.
+
+- Provide a minimal HTML loading status before the SPA scripts are ready,
+  then remove it on mount as the session or page UI takes over. This adds
+  visible startup feedback without changing session or access decisions.
+- Replace the timed loading shot with a production-browser regression that
+  independently gates JavaScript, session and dashboard responses. It
+  asserts and captures the startup status, session status, and named Home
+  shell with a substantial dashboard skeleton at both widths; release checks
+  verify transition to the loaded dashboard.
+- Show the end of recorded history at both pagers while preserving the top
+  range's live announcement and focus recovery.
+
+Round 7 evidence: `round-7/`, 134 screenshots. All six startup/session/dashboard
+pending captures come from the production browser suite with dependencies
+held until after visible assertions and capture; release assertions verify
+recovery. Both widths were visually checked. Standard checks pass, all 24
+production browser tests pass, and all eight seeded screenshot tests pass.
+Fresh independent council scoring is pending.
+
+
 ## Validation
 
 - `make test`: Go vet/tests, Svelte checks, lint, and 170 Vitest tests pass.
-- `make e2e`: 23 tests pass against the production build, including failed
+- `make e2e`: 24 tests pass against the production build, including failed
   sign-out/revoke-all, agent disable confirmation/failure, inventory filters,
   responsive navigation and overflow at 320–1440 px, and confirmation action
   visibility in short desktop and phone windows. Audit cases also cover

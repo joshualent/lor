@@ -1,6 +1,6 @@
 // End-to-end: the web UI against `lor-server serve --dev`, with Chrome's
 // virtual authenticator and the real `lor` CLI as the agent (plan section 13).
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page, type Route } from '@playwright/test';
 import { join } from 'node:path';
 import { addAuthenticator, lor, state } from './helpers';
 
@@ -607,6 +607,7 @@ test('audit history survives reconnects and empty boundaries preserve focus', as
 			await expect(top.getByRole('button', { name: 'Older events', exact: true })).toBeDisabled();
 			await expect(top).toBeFocused();
 			await expect(top.locator('[aria-live="polite"]')).toContainText('End of recorded history.');
+			await expect(top.getByText('End of recorded history.', { exact: true })).toBeVisible();
 			await expect(top.getByText('Events 176–200')).toBeVisible();
 			expect(await visibleIds()).toEqual(Array.from({ length: 25 }, (_, i) => 825 - i));
 			expect(cursors).toEqual(['901', '801']);
@@ -620,6 +621,61 @@ test('audit history survives reconnects and empty boundaries preserve focus', as
 			expect(cursors).toEqual(['901', '801', '902']); // Fresh pagination starts at the refreshed head.
 		} finally {
 			await page.unroute('**/api/admin/v1/audit*');
+		}
+	}
+	await page.setViewportSize({ width: 1280, height: 800 });
+});
+
+
+test('startup, session and dashboard loading states remain visible', async () => {
+	for (const [suffix, size] of [['desktop', { width: 1280, height: 800 }], ['phone', { width: 390, height: 844 }]] as const) {
+		await page.setViewportSize(size);
+		let releaseScripts!: () => void;
+		let releaseSession!: () => void;
+		let releaseDashboard!: () => void;
+		const scripts = new Promise<void>(resolve => { releaseScripts = resolve; });
+		const session = new Promise<void>(resolve => { releaseSession = resolve; });
+		const dashboard = new Promise<void>(resolve => { releaseDashboard = resolve; });
+		const holdScripts = async (route: Route) => {
+			if (route.request().resourceType() === 'script') await scripts;
+			await route.fallback();
+		};
+		const holdSession = async (route: Route) => { await session; await route.continue(); };
+		const holdDashboard = async (route: Route) => { await dashboard; await route.continue(); };
+		await page.route('**/api/admin/v1/session', holdSession);
+		await page.route('**/*', holdScripts);
+		try {
+			await page.goto('/', { waitUntil: 'commit' });
+			const startup = page.locator('#lor-startup');
+			await expect(startup).toBeVisible();
+			await expect(startup).toHaveText('Loading Lor…');
+			await page.screenshot({ path: join(shots, `loading-startup-${suffix}.png`) });
+			releaseScripts();
+			const checking = page.getByRole('status').filter({ hasText: 'Checking your session…' });
+			await expect(checking).toBeVisible();
+			await expect(startup).toHaveCount(0);
+			await page.screenshot({ path: join(shots, `loading-session-${suffix}.png`) });
+			releaseSession();
+			await page.unroute('**/*', holdScripts);
+			await page.unroute('**/api/admin/v1/session', holdSession);
+			await expect(page.getByRole('heading', { name: 'Home', exact: true })).toBeVisible();
+			await page.route('**/api/admin/v1/dashboard', holdDashboard);
+			await page.reload({ waitUntil: 'domcontentloaded' });
+			await expect(page.getByRole('navigation', { name: 'Main', exact: true })).toBeVisible();
+			await expect(page.getByRole('heading', { name: 'Home', exact: true })).toBeVisible();
+			const skeleton = page.locator('[data-slot="dashboard-skeleton"]');
+			await expect(skeleton).toBeVisible();
+			expect((await skeleton.boundingBox())!.height).toBeGreaterThan(250);
+			expect(await skeleton.locator('[data-slot="skeleton"]').count()).toBeGreaterThan(10);
+			await page.screenshot({ path: join(shots, `loading-dashboard-${suffix}.png`) });
+			releaseDashboard();
+			await expect(skeleton).toHaveCount(0);
+			await expect(page.getByRole('heading', { name: 'Recent activity', exact: true })).toBeVisible();
+		} finally {
+			releaseScripts(); releaseSession(); releaseDashboard();
+			await page.unroute('**/*', holdScripts);
+			await page.unroute('**/api/admin/v1/session', holdSession);
+			await page.unroute('**/api/admin/v1/dashboard', holdDashboard);
 		}
 	}
 	await page.setViewportSize({ width: 1280, height: 800 });

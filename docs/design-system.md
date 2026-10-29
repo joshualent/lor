@@ -302,3 +302,14 @@ Don't:
   they do not alter the selected access or acknowledgement.
 - Timeline entries keep recorded order. Equal timestamps carry an explanation
   of their one-second precision instead of implying an exact action sequence.
+
+
+## Startup feedback
+
+The static HTML supplies a minimal charcoal loading status before the SPA
+scripts are available. The root removes it after mounting, when the session
+status or normal page takes over. Dashboard requests use the matching summary
+and list skeleton. Browser checks hold each dependency independently and
+assert the intended state before capturing it; they do not use a fixed delay
+to infer that a loading state has appeared. Audit history end text is visible
+at both pagers and announced through the top range.

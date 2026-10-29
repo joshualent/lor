@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '../app.css';
+	import { onMount } from 'svelte';
 	import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
 	import { Toaster } from '#lib/components/ui/sonner/index.js';
 	import Shell from '#lib/components/lor/Shell.svelte';
@@ -7,6 +8,10 @@
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
+
+	onMount(() => {
+		document.getElementById('lor-startup')?.remove();
+	});
 
 	const queryClient = new QueryClient({
 		defaultOptions: {

@@ -294,7 +294,7 @@
 					class="min-w-0 text-center text-footnote wrap-anywhere text-muted-foreground nums"
 					aria-live={footer ? 'off' : 'polite'}
 				>
-					{eventRange}{#if !canGoOlder && !q.isPlaceholderData}<span class="sr-only"
+					{eventRange}{#if !footer && !canGoOlder && !q.isPlaceholderData}<span class="sr-only"
 							>. End of recorded history.</span
 						>{/if}
 				</span>
@@ -331,8 +331,13 @@
 				<span class="block">Select Older to try again.</span>
 			</p>
 		{/if}
-		{#if footer && !canGoOlder && !q.isPlaceholderData}
-			<p class="text-center text-footnote text-muted-foreground">End of recorded history.</p>
+		{#if !canGoOlder && !q.isPlaceholderData}
+			<p
+				aria-hidden={footer ? undefined : 'true'}
+				class="text-center text-footnote text-muted-foreground sm:text-left"
+			>
+				End of recorded history.
+			</p>
 		{/if}
 	</nav>
 {/snippet}

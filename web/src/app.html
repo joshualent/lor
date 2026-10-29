@@ -7,9 +7,25 @@
 		<meta name="theme-color" content="#232326" />
 		<meta name="referrer" content="same-origin" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.svg" type="image/svg+xml" />
+		<style>
+			/* First paint, before the SPA's stylesheet and JavaScript are ready. */
+			#lor-startup {
+				position: fixed;
+				inset: 0;
+				z-index: 100;
+				display: grid;
+				place-items: center;
+				background: var(--background, #232326);
+				color: var(--muted-foreground, #a9a9b2);
+				font:
+					400 15px/1.5 system-ui,
+					sans-serif;
+			}
+		</style>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
+		<div id="lor-startup" role="status">Loading Lor…</div>
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
 </html>

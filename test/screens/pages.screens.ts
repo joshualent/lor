@@ -397,19 +397,7 @@ test('screens', async () => {
 	await shoot('settings', '/settings');
 	await shoot('error-grant-404', '/grants/99999');
 	await shoot('error-host-404', '/hosts/nope');
-	await shoot('loading-dashboard', '/', {
-		fullPage: false,
-		prepare: async (p) => {
-			await p.unroute('**/api/admin/v1/dashboard');
-			await p.route('**/api/admin/v1/dashboard', async (r) => {
-				await new Promise((ok) => setTimeout(ok, 4000));
-				await r.continue().catch(() => {});
-			});
-			await p.reload();
-			await p.waitForTimeout(700);
-		}
-	});
-	await page.unroute('**/api/admin/v1/dashboard');
+
 	if (process.env.LOR_SCREENS_GALLERY !== '0') {
 		const res = await page.goto('/gallery');
 		if (res?.ok()) await shoot('gallery', '/gallery');
