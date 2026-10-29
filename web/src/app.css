@@ -242,3 +242,10 @@
 		}
 	}
 }
+
+@utility compact-actions-only {
+	display: none;
+	@media (max-width: 359px), (max-height: 699px) {
+		display: block;
+	}
+}

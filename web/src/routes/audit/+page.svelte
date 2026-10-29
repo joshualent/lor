@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { parseGrantFilter } from '#lib/grant-filter.js';
+	import ArrowUp from '@lucide/svelte/icons/arrow-up';
 	import ScrollText from '@lucide/svelte/icons/scroll-text';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -44,7 +45,7 @@
 	let moreError = $state<unknown>(null);
 
 	const grantFilter = $derived(parseGrantFilter(grantQuery));
-	let filterRevision = 0;
+	let historyGeneration = 0;
 	const filter = $derived({
 		actor: actor || undefined,
 		action: action.trim() || undefined,
@@ -58,13 +59,34 @@
 		placeholderData: keepPreviousData,
 		enabled: !grantFilter.error
 	}));
-	$effect(() => {
-		void filter;
-		filterRevision++;
+	function resetHistory() {
+		historyGeneration++;
 		older = [];
 		olderDone = false;
 		loadingMore = false;
 		moreError = null;
+	}
+	$effect(() => {
+		void filter;
+		resetHistory();
+	});
+	function backToLatest() {
+		resetHistory();
+		void q.refetch();
+	}
+
+	let filtersElement = $state<HTMLDivElement | null>(null);
+	let filtersVisible = $state(true);
+	$effect(() => {
+		if (!filtersElement) return;
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				filtersVisible = entry.isIntersecting;
+			},
+			{ rootMargin: '-80px 0px 0px 0px' }
+		);
+		observer.observe(filtersElement);
+		return () => observer.disconnect();
 	});
 
 	// Keep the filters in the URL, so a filtered log can be shared or reloaded.
@@ -99,23 +121,23 @@
 	async function more() {
 		const last = events.at(-1);
 		if (!last || loadingMore || q.isFetching || q.isPlaceholderData || grantFilter.error) return;
-		const revision = filterRevision;
+		const revision = historyGeneration;
 		const initiatingFilter = { ...filter };
 		loadingMore = true;
 		moreError = null;
 		try {
 			const next = await fetchAudit({ ...initiatingFilter, before: last.id });
 			if (
-				revision !== filterRevision ||
+				revision !== historyGeneration ||
 				JSON.stringify(initiatingFilter) !== JSON.stringify(filter)
 			)
 				return;
 			if (next.length < PAGE) olderDone = true;
 			older = [...older, ...next];
 		} catch (e) {
-			if (revision === filterRevision) moreError = e;
+			if (revision === historyGeneration) moreError = e;
 		} finally {
-			if (revision === filterRevision) loadingMore = false;
+			if (revision === historyGeneration) loadingMore = false;
 		}
 	}
 
@@ -136,52 +158,65 @@
 			>{/if}{/snippet}
 </PageHeader>
 
-<Toolbar label="Filters">
-	<div class="space-y-2">
-		<p class="text-footnote text-muted-foreground">Who</p>
-		<SegmentedControl
-			label="Who"
-			bind:value={actor}
-			options={ACTOR_FILTERS.map((f) => ({ value: f.value, label: f.label }))}
-			class="w-full sm:w-auto"
-			fill
-		/>
-	</div>
-	<div
-		class="grid grid-cols-[minmax(0,1fr)_7.5rem] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]"
-	>
-		<div class="min-w-0 space-y-2">
-			<label for="audit-category" class="block text-footnote text-muted-foreground sm:hidden"
-				>Category</label
-			>
-			<p class="hidden text-footnote text-muted-foreground sm:block">Category</p>
-			<NativeSelect id="audit-category" bind:value={action} class="sm:hidden"
-				>{#each categories as c (c.prefix)}<option value={c.prefix}
-						>{c.prefix ? c.label : 'All categories'}</option
-					>{/each}</NativeSelect
-			>
-			<ChipGroup
-				label="Category"
-				bind:value={action}
-				options={categories.map((c) => ({ value: c.prefix, label: c.label }))}
-				class="hidden sm:flex"
-			/>
-		</div>
+<div bind:this={filtersElement}>
+	<Toolbar id="audit-filters" label="Filters">
 		<div class="space-y-2">
-			<label for="audit-grant-number" class="block text-footnote text-muted-foreground"
-				>Grant number</label
-			><SearchField
-				bind:value={grant}
-				id="audit-grant-number"
-				aria-invalid={!!grantFilter.error}
-				aria-describedby={grantFilter.error ? 'audit-grant-error' : undefined}
-				label="Grant number"
-				placeholder="Grant #"
-				inputmode="numeric"
+			<p class="text-footnote text-muted-foreground">Who</p>
+			<SegmentedControl
+				label="Who"
+				bind:value={actor}
+				options={ACTOR_FILTERS.map((f) => ({ value: f.value, label: f.label }))}
+				class="w-full sm:w-auto"
+				fill
 			/>
 		</div>
-	</div>
-</Toolbar>
+		<div
+			class="grid grid-cols-[minmax(0,1fr)_7.5rem] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]"
+		>
+			<div class="min-w-0 space-y-2">
+				<label for="audit-category" class="block text-footnote text-muted-foreground sm:hidden"
+					>Category</label
+				>
+				<p class="hidden text-footnote text-muted-foreground sm:block">Category</p>
+				<NativeSelect id="audit-category" bind:value={action} class="sm:hidden"
+					>{#each categories as c (c.prefix)}<option value={c.prefix}
+							>{c.prefix ? c.label : 'All categories'}</option
+						>{/each}</NativeSelect
+				>
+				<ChipGroup
+					label="Category"
+					bind:value={action}
+					options={categories.map((c) => ({ value: c.prefix, label: c.label }))}
+					class="hidden sm:flex"
+				/>
+			</div>
+			<div class="space-y-2">
+				<label for="audit-grant-number" class="block text-footnote text-muted-foreground"
+					>Grant number</label
+				><SearchField
+					bind:value={grant}
+					id="audit-grant-number"
+					aria-invalid={!!grantFilter.error}
+					aria-describedby={grantFilter.error ? 'audit-grant-error' : undefined}
+					label="Grant number"
+					placeholder="Grant #"
+					inputmode="numeric"
+				/>
+			</div>
+		</div>
+	</Toolbar>
+</div>
+{#if older.length > 0}<div
+		role="group"
+		aria-label="Audit history controls"
+		class="mb-4 flex flex-wrap items-center justify-between gap-x-3 text-footnote text-muted-foreground"
+	>
+		<span>Live updates paused while viewing older events.</span><Button
+			variant="link"
+			size="sm"
+			onclick={backToLatest}>Back to latest</Button
+		>
+	</div>{/if}
 {#if grantFilter.error}<p
 		id="audit-grant-error"
 		role="alert"
@@ -250,12 +285,7 @@
 				<span>Live updates paused while viewing older events.</span><Button
 					variant="link"
 					size="sm"
-					onclick={() => {
-						older = [];
-						olderDone = false;
-						moreError = null;
-						q.refetch();
-					}}>Back to latest</Button
+					onclick={backToLatest}>Back to latest</Button
 				>
 			</div>{/if}
 		{#if moreError}
@@ -277,3 +307,11 @@
 		{/if}
 	</div>
 {/if}
+
+{#if !filtersVisible}<div
+		class="pointer-events-none fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-20 sm:right-6"
+	>
+		<Button href="#audit-filters" variant="secondary" class="pointer-events-auto border-border"
+			><ArrowUp /> Back to filters</Button
+		>
+	</div>{/if}

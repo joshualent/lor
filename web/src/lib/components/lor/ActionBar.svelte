@@ -4,10 +4,14 @@
 	// bottom of the screen; compact windows use the flow to preserve reading space.
 	import type { Snippet } from 'svelte';
 
-	let { children, note }: { children: Snippet; note?: Snippet } = $props();
+	let { children, note, id }: { children: Snippet; note?: Snippet; id?: string } = $props();
 </script>
 
 <div
+	{id}
+	tabindex="-1"
+	role="group"
+	aria-label="Decision"
 	data-slot="action-bar"
 	class="decision-actions sticky bottom-0 z-10 -mx-4 space-y-2.5 border-t border-border bg-background/90 px-4 pt-3 pb-[max(0.875rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:mx-0 sm:rounded-xl sm:border sm:pb-3"
 >

@@ -115,14 +115,59 @@ Round 3 evidence: `round-3/`, 100 images including focused consent controls
 at 320×568, 390×620 and 390×844, desktop decision-bar viewports, and the
 controlled audit updating and invalid-filter states. The screenshot suite
 also verifies accessible grant identity and that focused choices are not
-obscured by navigation or actions. Round 3 council scoring is pending.
+obscured by navigation or actions. Round 3 scoring is recorded below.
+
+## Round 3 scores
+
+| Category | Sol | Terra | Opus 5.5 |
+|---|---:|---:|---:|
+| Usability | 7 | 7 | 8 |
+| Visual Hierarchy | 9 | 8 | 8 |
+| Consistency | 8 | 8 | 8 |
+| Responsiveness | 8 | 8 | 8 |
+| Clarity | 8 | 7 | 8 |
+| Efficiency | 8 | 7 | 8 |
+| Learnability | 8 | 8 | 8 |
+| Layout & Composition | 8 | 8 | 8 |
+| Typography | 8 | 8 | 8 |
+| Color theory & contrast | 9 | 8 | 8 |
+| Whitespace | 8 | 8 | 8 |
+| Perceived performance | 8 | 8 | 8 |
+| Accessibility | 8 | 8 | 8 |
+
+Opus reached the acceptance target. Sol identified a pending-pagination reset
+race; Terra requested a direct reason jump, denser narrow lists and an
+explanation of timestamp ties. All three reviewed commit 82a6687 against the
+same screenshot evidence.
+
+## Changes for round 4
+
+- History resets invalidate pending pagination success, failure and cleanup,
+  including Back to latest with unchanged filters. Regression tests cover
+  both delayed outcomes and correct continuation from the fresh latest page.
+- Consent offers a direct Read full reason link, preserves the complete
+  unverified text, and adds a focused decision jump for compact windows.
+  Tests exercise long reasons and both ends of the text without changing
+  the acknowledgement or authorization gate.
+- Narrow pending/audit rows give text more room while keeping complete
+  identity, time, risk labels and touch targets. Audit exposes history
+  controls near the filters and a return-to-filters shortcut after scrolling.
+- Deny and withdraw confirmations include complete identity. Timestamp ties
+  get an explanation based on the server's Unix-second audit precision;
+  recorded event order is preserved.
+
+Round 4 evidence: `round-4/`, 112 screenshots, including long-reason start/end
+views, compact decision jumps, and phone audit-history controls. The full
+suite passes 170 frontend tests, 21 production E2E tests and eight screenshot
+tests. Round 4 council scoring is pending.
+
 
 ## Validation
 
 - `make test`: Go vet/tests, Svelte checks, lint, and 170 Vitest tests pass.
-- `make e2e`: 19 tests pass against the production build, including failed
+- `make e2e`: 21 tests pass against the production build, including failed
   sign-out/revoke-all, agent disable confirmation/failure, inventory filters,
   responsive navigation and overflow at 320–1440 px, and confirmation action
   visibility in short desktop and phone windows.
-- `make screens`: all seven seeded screenshot tests pass; responsive
+- `make screens`: all eight seeded screenshot tests pass; responsive
   checkpoints also assert no horizontal page overflow.

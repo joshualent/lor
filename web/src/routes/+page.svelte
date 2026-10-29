@@ -193,6 +193,7 @@
 					<List data-testid="pending">
 						{#each d.pending_requests as g (g.id)}
 							<ListRow
+								compactOnNarrow
 								href="/r/{g.id}"
 								density="relaxed"
 								label="Review {g.agent.name} request for {g.requested_level === 'sudo'
@@ -232,6 +233,7 @@
 						{/each}
 						{#each d.pending_extensions as x (x.extension.id)}
 							<ListRow
+								compactOnNarrow
 								href="/e/{x.extension.id}"
 								density="relaxed"
 								label="Review {x.grant.agent.name} extension request on {x.grant.host
@@ -402,8 +404,9 @@
 		description={revokeFor?.status === 'offered' ? WITHDRAW_NOTE : REVOKE_NOTE}
 	>
 		{#if revokeFor}<p class="text-callout">
-				{revokeFor.agent.name} · {revokeFor.level === 'sudo' ? 'sudo (root)' : 'standard user'} · Grant
-				#{revokeFor.id}
+				{revokeFor.agent.name} on {revokeFor.host.name} · {revokeFor.level === 'sudo'
+					? 'sudo (root)'
+					: 'standard user'} · Grant #{revokeFor.id}
 			</p>{/if}
 		{#snippet footer()}
 			<Button variant="outline" onclick={() => (revokeOpen = false)}>Cancel</Button>

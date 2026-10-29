@@ -204,6 +204,7 @@
 					<span class="text-footnote text-muted-foreground"
 						>Request #{g.id} · {formatAgo(Date.parse(g.requested_at), clock.now)}</span
 					>
+					<Button href="#agent-reason" variant="link" size="sm">Read full reason</Button>
 					<div
 						class="flex w-full items-center justify-between gap-3 border-t border-separator pt-2 text-callout"
 					>
@@ -228,7 +229,14 @@
 
 			<Warnings warnings={g.warnings} {level} />
 
-			<UnverifiedText text={g.reason} />
+			<section
+				id="agent-reason"
+				tabindex="-1"
+				aria-label="Full agent reason, unverified"
+				class="rounded-xl focus-ring"
+			>
+				<UnverifiedText text={g.reason} />
+			</section>
 
 			<Section title="Request">
 				<DescriptionList>
@@ -292,6 +300,10 @@
 				</Card>
 			</Section>
 
+			<div class="compact-actions-only">
+				<Button href="#grant-decision" variant="link" size="sm">Go to decision</Button>
+			</div>
+
 			<Section title="Limits">
 				<ul class="space-y-2 rounded-xl bg-card px-4 py-3">
 					{#each g.consent.limits as lim (lim)}
@@ -303,7 +315,7 @@
 				</ul>
 			</Section>
 
-			<ActionBar>
+			<ActionBar id="grant-decision">
 				{#snippet note()}
 					{#if sudo}
 						<label
@@ -513,6 +525,11 @@
 		title="Deny this request?"
 		description="The agent is told it was denied. You can add a note."
 	>
+		<p class="text-callout">
+			{g.agent.name} on {g.host.name} · {g.requested_level === 'sudo'
+				? 'sudo (root)'
+				: 'standard user'} · Request #{g.id}
+		</p>
 		<div class="space-y-2">
 			<Label for="deny-note">Note (optional)</Label>
 			<Textarea id="deny-note" bind:value={note} maxlength={1000} rows={3} />
@@ -534,7 +551,8 @@
 		description={g.status === 'offered' ? WITHDRAW_NOTE : REVOKE_NOTE}
 	>
 		<p class="text-callout">
-			{g.agent.name} · {g.level === 'sudo' ? 'sudo (root)' : 'standard user'} · Grant #{g.id}
+			{g.agent.name} on {g.host.name} · {g.level === 'sudo' ? 'sudo (root)' : 'standard user'} · Grant
+			#{g.id}
 		</p>
 		<div class="space-y-2">
 			<Label for="revoke-note">Note (optional)</Label>

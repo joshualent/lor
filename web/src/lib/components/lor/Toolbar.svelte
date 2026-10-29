@@ -4,13 +4,16 @@
 	import { cn } from '#lib/utils.js';
 
 	let {
+		id,
 		label,
 		children,
 		class: className
-	}: { label: string; children: Snippet; class?: string } = $props();
+	}: { id?: string; label: string; children: Snippet; class?: string } = $props();
 </script>
 
 <div
+	{id}
+	tabindex="-1"
 	role="group"
 	aria-label={label}
 	data-slot="toolbar"

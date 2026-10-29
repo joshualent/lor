@@ -19,6 +19,7 @@
 		reserveChevron = false,
 		density = 'default',
 		stackMeta = false,
+		compactOnNarrow = false,
 		tone = 'default',
 		disabled = false,
 		expanded,
@@ -46,6 +47,8 @@
 		density?: 'default' | 'compact' | 'relaxed';
 		/** Put metadata below the text on phones, for long addresses or summaries. */
 		stackMeta?: boolean;
+		/** Hide decorative leading tiles and tighten layout below 400px. */
+		compactOnNarrow?: boolean;
 		tone?: 'default' | 'danger' | 'accent';
 		disabled?: boolean;
 		/** For disclosure rows (button): aria-expanded. */
@@ -68,7 +71,15 @@
 	const interactive = $derived(!!href || !!onclick);
 	const showChevron = $derived(chevron ?? !!href);
 	const s = $derived(
-		listRowVariants({ interactive, hasTrailing: !!trailing, density, tone, disabled, stackMeta })
+		listRowVariants({
+			interactive,
+			hasTrailing: !!trailing,
+			density,
+			tone,
+			disabled,
+			stackMeta,
+			compactOnNarrow
+		})
 	);
 </script>
 

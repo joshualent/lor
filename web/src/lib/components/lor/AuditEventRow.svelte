@@ -48,6 +48,7 @@
 
 <ListRow
 	stackMeta
+	compactOnNarrow
 	reserveChevron
 	onclick={expandable ? () => (open = !open) : undefined}
 	expanded={expandable ? open : undefined}

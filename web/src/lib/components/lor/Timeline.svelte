@@ -7,7 +7,15 @@
 	import { iconTileVariants } from '#lib/design/variants.js';
 
 	let { events }: { events: AuditEvent[] } = $props();
+	const tiedTimes = $derived(
+		new Set(events.map((event) => Date.parse(event.ts))).size < events.length
+	);
 </script>
+
+{#if tiedTimes}<p class="mb-3 px-1 text-footnote text-muted-foreground">
+		Events with the same timestamp share a one-second time window. The log order may differ from the
+		action sequence.
+	</p>{/if}
 
 <ol class="rounded-xl bg-card px-4 py-1" data-slot="timeline">
 	{#each events as ev, i (ev.id)}

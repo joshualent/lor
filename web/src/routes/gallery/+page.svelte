@@ -378,6 +378,14 @@
 					>
 				{/snippet}
 			</ListRow>
+			<ListRow
+				href="#"
+				compactOnNarrow
+				title="codex on media"
+				subtitle="A compact request preview on phones."
+				density="relaxed"
+				>{#snippet leading()}<IconTile icon={Inbox} tone="warning" />{/snippet}</ListRow
+			>
 			<ListRow onclick={() => {}} title="Sign out everywhere" tone="danger" density="compact">
 				{#snippet leading()}<IconTile icon={ShieldAlert} tone="danger" size="sm" />{/snippet}
 			</ListRow>

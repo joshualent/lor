@@ -390,3 +390,66 @@ test('audit does not show empty or completion claims while filters update', asyn
 	await expect(page.getByText(/Updating results/)).toHaveCount(0);
 	await page.unroute('**/api/admin/v1/audit*');
 });
+
+for (const outcome of ['success', 'failure'] as const) {
+	test(`Back to latest ignores an obsolete older-page ${outcome}`, async () => {
+		const seed = await (await page.request.get('/api/admin/v1/audit')).json();
+		const template = seed.events[0];
+		const events = (first: number, action: string) => Array.from({ length: 100 }, (_, index) => ({ ...template, id: first - index, action }));
+		let baseReads = 0;
+		let resumedCursor = '';
+		let release!: () => void;
+		let started!: () => void;
+		const pending = new Promise<void>((resolve) => { release = resolve; });
+		const ready = new Promise<void>((resolve) => { started = resolve; });
+		await page.route('**/api/admin/v1/audit*', async (route) => {
+			const cursor = new URL(route.request().url()).searchParams.get('before');
+			if (cursor === '801') {
+				started();
+				await pending;
+				await route.fulfill(outcome === 'success'
+					? { json: { events: events(800, 'agent.disabled') } }
+					: { status: 500, json: { error: { code: 'test', message: 'Obsolete history request' } } });
+			} else if (cursor === '901') {
+				await route.fulfill({ json: { events: events(900, 'agent.created') } });
+			} else if (cursor) {
+				resumedCursor = cursor;
+				await route.fulfill({ json: { events: events(1000, 'grant.extended') } });
+			} else {
+				baseReads++;
+				await route.fulfill({ json: { events: baseReads === 1 ? events(1000, 'grant.requested') : events(1100, 'host.created') } });
+			}
+		});
+		try {
+			await page.goto('/audit');
+			await page.getByRole('button', { name: 'Load older events', exact: true }).click();
+			await expect(page.locator('[data-action="agent.created"]')).toHaveCount(100);
+			const viewport = outcome === 'success' ? { width: 320, height: 568 } : { width: 390, height: 844 };
+			await page.setViewportSize(viewport);
+			await page.getByRole('button', { name: 'Load older events', exact: true }).click();
+			await ready;
+			await page.screenshot({ path: join(shots, `audit-return-filters-${viewport.width}.png`) });
+			await page.getByRole('link', { name: 'Back to filters', exact: true }).click();
+			await expect(page.getByRole('group', { name: 'Filters', exact: true })).toBeFocused();
+			const controls = page.getByRole('group', { name: 'Audit history controls', exact: true });
+			await expect(controls).toBeVisible();
+			await page.screenshot({ path: join(shots, `audit-history-paused-${viewport.width}.png`) });
+			await controls.getByRole('button', { name: 'Back to latest', exact: true }).click();
+			await expect(page.locator('[data-action="host.created"]')).toHaveCount(100);
+			const response = page.waitForResponse((r) => new URL(r.url()).searchParams.get('before') === '801');
+			release();
+			await (await response).finished();
+			await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+			await expect(page.locator('[data-action="agent.disabled"], [data-action="agent.created"]')).toHaveCount(0);
+			await expect(page.getByText(/Obsolete history request/)).toHaveCount(0);
+			await expect(controls).toHaveCount(0);
+			await page.getByRole('button', { name: 'Load older events', exact: true }).click();
+			await expect(page.locator('[data-action="grant.extended"]')).toHaveCount(100);
+			expect(resumedCursor).toBe('1001');
+		} finally {
+			release();
+			await page.unroute('**/api/admin/v1/audit*');
+			await page.setViewportSize({ width: 1280, height: 800 });
+		}
+	});
+}

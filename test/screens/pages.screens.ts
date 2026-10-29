@@ -461,3 +461,40 @@ test('grant identity and consent focus remain clear in compact windows', async (
 		await page.screenshot({ path: join(out, `consent-focused-${size.width}-${size.height}.png`) });
 	}
 });
+
+test('full reasons and compact decision jumps are reachable', async () => {
+	const reason = Array.from({ length: 12 }, (_, index) => `Step ${index + 1}: I will inspect the service logs and identify the failed renewal before making a change.`).join('\n') + '\nEnd of the agent’s reason.';
+	await page.route(`**/api/admin/v1/grants/${ids.caddy}`, async (route) => {
+		const response = await route.fetch();
+		const data = await response.json();
+		await route.fulfill({ response, json: { ...data, reason } });
+	});
+	for (const size of [{ width: 320, height: 568 }, { width: 390, height: 620 }, PHONE]) {
+		await page.setViewportSize(size);
+		await page.goto(`/r/${ids.caddy}`);
+		const read = page.getByRole('link', { name: 'Read full reason', exact: true });
+		await expect(read).toBeInViewport();
+		await read.click();
+		const region = page.getByRole('region', { name: 'Full agent reason, unverified' });
+		await expect(region).toBeFocused();
+		const block = region.getByTestId('unverified-text');
+		await expect(block).toHaveText(reason);
+		await page.screenshot({ path: join(out, `consent-reason-start-${size.width}-${size.height}.png`) });
+		await block.evaluate((el) => el.scrollIntoView({ block: 'end' }));
+		const bar = page.locator('[data-slot="action-bar"]');
+		const position = await bar.evaluate((el) => getComputedStyle(el).position);
+		const end = (await block.boundingBox())!;
+		const bottom = position === 'sticky' ? (await bar.boundingBox())!.y : size.height;
+		expect(end.y + end.height).toBeLessThanOrEqual(bottom);
+		await page.screenshot({ path: join(out, `consent-reason-end-${size.width}-${size.height}.png`) });
+		if (position === 'static') {
+			await page.getByRole('link', { name: 'Go to decision', exact: true }).click();
+			await expect(page.getByRole('group', { name: 'Decision', exact: true })).toBeFocused();
+			await expect(page.getByTestId('authorize')).toBeInViewport();
+			await page.screenshot({ path: join(out, `consent-decision-jump-${size.width}-${size.height}.png`) });
+		}
+		await expect(page.getByTestId('authorize')).toBeDisabled();
+		await expect(page.getByRole('checkbox')).not.toBeChecked();
+	}
+	await page.unroute(`**/api/admin/v1/grants/${ids.caddy}`);
+});

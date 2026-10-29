@@ -200,6 +200,16 @@ export const listRowVariants = tv({
 			},
 			false: {}
 		},
+		compactOnNarrow: {
+			true: {
+				main: 'max-[399px]:grid max-[399px]:grid-cols-[minmax(0,1fr)_auto] max-[399px]:gap-x-2 max-[399px]:gap-y-0.5 max-[399px]:px-3 max-[399px]:py-2 max-[399px]:min-h-11',
+				leading: 'max-[399px]:hidden',
+				content: 'max-[399px]:col-start-1 max-[399px]:row-start-1',
+				meta: 'max-[399px]:col-start-1 max-[399px]:row-start-2',
+				chevron: 'max-[399px]:col-start-2 max-[399px]:row-start-1 max-[399px]:row-span-2'
+			},
+			false: {}
+		},
 		stackMeta: {
 			true: {
 				main: 'grid grid-cols-[auto_minmax(0,1fr)_auto] gap-y-1 sm:flex',

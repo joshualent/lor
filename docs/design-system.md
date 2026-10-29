@@ -282,3 +282,13 @@ Don't:
   older history pauses automatic refresh, with a Back to latest action.
 - Narrow audit and host rows stack metadata; long description values can
   use the responsive layout. Selected segments include an accent marker.
+
+- Pending-request and audit rows use a compact layout below 400 px, preserving
+  identity, risk labels, timestamps and 44 px targets while hiding decorative
+  leading tiles. Audit offers a return-to-filters link when the toolbar is
+  out of view, and repeats paused-history controls near the toolbar.
+- Consent provides Read full reason from its header. Compact windows also
+  have Go to decision after the choices. These links focus their destination;
+  they do not alter the selected access or acknowledgement.
+- Timeline entries keep recorded order. Equal timestamps carry an explanation
+  of their one-second precision instead of implying an exact action sequence.
