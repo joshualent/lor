@@ -94,7 +94,7 @@ Body is 15 px. Use these utilities, not raw sizes:
 
 | Utility | Size / weight | Use |
 |---|---|---|
-| `text-title` | 26 / 650, tight | page titles (one per page) |
+| `text-title` | 30 / 650, tight | page titles (one per page) |
 | `text-headline` | 18 / 600 | dialog titles, hero numbers |
 | `text-heading` | 15 / 600 | section headers, empty-state titles |
 | `text-body` | 15 / 400 | row titles, values, paragraphs |
@@ -131,10 +131,11 @@ The merge helpers (`cn()` and tailwind-variants) are configured
 
 | Component | Purpose |
 |---|---|
-| `Shell` | app frame: sticky translucent top nav (with a pending-count badge on Home), route guard |
+| `Shell` | app frame: quiet side navigation on desktop, labelled icon navigation on phones, pending count on Home, skip link and route guard |
 | `PageHeader` | back link (detail pages), leading tile, title (sets `<title>`), subtitle, `meta` badges, `actions` |
 | `Section` / `SectionHeader` | a page region: title, count, description, action, footnote |
-| `Card` | painted surface for free-form content (forms, summaries) |
+| `Card` | outlined surface for free-form content (forms, summaries) |
+| `SummaryCard` | linked count, label and explanation; semantic color on nonzero counts, neutral zero state |
 | `ActionBar` | the page's decision buttons in one row (secondary first, primary `flex-1`, label may wrap); sticky at the bottom on phones |
 | `AuthCard` | signed-out screens (login, setup) |
 
@@ -193,6 +194,7 @@ The merge helpers (`cn()` and tailwind-variants) are configured
 
 ## Patterns
 
+- **Workspace:** desktop navigation uses a 208 px rail from 1024 px; phones and tablets use a sticky header with five labelled destinations. Main lists use the available width; forms and detail pages stay at a readable 768 px maximum. The Home dashboard places decisions beside live access from 1280 px; Settings groups security controls beside read-only server configuration.
 - **Page anatomy:** `PageHeader` → (callouts) → `Section`s, each a header plus
   a `List`, `DescriptionList` or `Card`. No hand-rolled surfaces in pages.
 - **List → detail:** list rows link to a detail page with a back link

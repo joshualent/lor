@@ -76,14 +76,14 @@
 	};
 	const enabled = $derived(all.filter((h) => !h.disabled && matches(h)));
 	const disabled = $derived(all.filter((h) => h.disabled && matches(h)));
-	const subtitle = $derived(
+	const inventorySummary = $derived(
 		hosts.data
 			? `${all.length} ${all.length === 1 ? 'host' : 'hosts'}${all.some((h) => h.disabled) ? ` · ${all.filter((h) => h.disabled).length} disabled` : ''}`
 			: undefined
 	);
 </script>
 
-<PageHeader title="Hosts" {subtitle}>
+<PageHeader title="Hosts" subtitle="Manage the machines agents can request access to.">
 	{#snippet actions()}<Button onclick={() => (open = true)}><Plus /> Add host</Button>{/snippet}
 </PageHeader>
 
@@ -140,9 +140,15 @@
 	</EmptyState>
 {:else}
 	<div class="space-y-7">
-		{#if all.length > 4}
-			<SearchField bind:value={search} label="Filter hosts" placeholder="Filter by name or IP" />
-		{/if}
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<p class="text-callout text-muted-foreground">{inventorySummary}</p>
+			<SearchField
+				bind:value={search}
+				label="Filter hosts"
+				placeholder="Find a host by name or IP…"
+				class="w-full sm:w-72"
+			/>
+		</div>
 		{#if enabled.length === 0 && disabled.length === 0}
 			<EmptyState title="No matching hosts" description="Try another name or address." />
 		{/if}

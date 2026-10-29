@@ -36,7 +36,7 @@
 	<title>{documentTitle ?? title} · Lor</title>
 </svelte:head>
 
-<header class="mb-6 sm:mb-8" data-slot="page-header">
+<header class="mb-7 border-b border-border pb-6 sm:mb-8 sm:pb-7" data-slot="page-header">
 	{#if back}
 		<a
 			href={back.href}
@@ -52,13 +52,19 @@
 				<h1 class="text-title break-words" aria-label={heading ? title : undefined}>
 					{#if heading}{@render heading()}{:else}{title}{/if}
 				</h1>
-				{#if subtitle && leading}<p class="mt-1 text-callout text-muted-foreground">
+				{#if subtitle && leading}<p
+						class="mt-2 max-w-prose text-callout leading-relaxed text-muted-foreground"
+					>
 						{subtitle}
 					</p>{/if}
 			</div>
 		</div>
 		{#if actions}<div class="flex shrink-0 flex-wrap gap-2">{@render actions()}</div>{/if}
 	</div>
-	{#if subtitle && !leading}<p class="mt-1 text-callout text-muted-foreground">{subtitle}</p>{/if}
+	{#if subtitle && !leading}<p
+			class="mt-2 max-w-prose text-callout leading-relaxed text-muted-foreground"
+		>
+			{subtitle}
+		</p>{/if}
 	{#if meta}<div class="mt-3 flex flex-wrap items-center gap-2">{@render meta()}</div>{/if}
 </header>

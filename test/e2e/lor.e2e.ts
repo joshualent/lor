@@ -220,3 +220,38 @@ test('a failed background refresh keeps the last data on screen', async () => {
 	await page.getByRole('button', { name: 'Retry' }).click();
 	await expect(page.getByText("Couldn't refresh.")).toHaveCount(0);
 });
+
+test('navigation and inventories remain usable across phone, tablet and desktop widths', async () => {
+	for (const width of [320, 390, 768, 1024, 1440]) {
+		await page.setViewportSize({ width, height: 900 });
+		for (const path of ['/', '/hosts', '/agents', '/audit', '/settings']) {
+			await page.goto(path);
+			const navigation = page.getByRole('navigation', {
+				name: 'Main',
+				exact: true
+			});
+			await expect(navigation).toBeVisible();
+			await expect(navigation.locator('[aria-current="page"]')).toHaveCount(1);
+			for (const link of await navigation.getByRole('link').all()) {
+				await expect(link).toBeInViewport();
+				const box = await link.boundingBox();
+				expect(box!.height).toBeGreaterThanOrEqual(44);
+			}
+			const overflow = await page.evaluate(
+				() => document.documentElement.scrollWidth - document.documentElement.clientWidth
+			);
+			expect(overflow, `${path} overflows at ${width}px`).toBeLessThanOrEqual(0);
+		}
+	}
+	await page.goto('/agents');
+	await page.getByRole('searchbox', { name: 'Filter agents' }).fill('missing-agent');
+	await expect(page.getByText('No matching agents')).toBeVisible();
+	await page.getByRole('button', { name: 'Clear Filter agents' }).click();
+	await expect(page.getByRole('button', { name: /claude/ })).toBeVisible();
+	await page.goto('/hosts');
+	await page.getByRole('searchbox', { name: 'Filter hosts' }).fill('missing-host');
+	await expect(page.getByText('No matching hosts')).toBeVisible();
+	await page.getByRole('button', { name: 'Clear Filter hosts' }).click();
+	await expect(page.getByRole('link', { name: /nas/ }).last()).toBeVisible();
+	await page.setViewportSize({ width: 1280, height: 720 });
+});

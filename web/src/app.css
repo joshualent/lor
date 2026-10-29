@@ -82,9 +82,9 @@
 	--font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 
 	/* Type scale (body is 15px). Use these names, not raw text-[..] sizes. */
-	--text-title: 1.625rem;
+	--text-title: 1.875rem;
 	--text-title--line-height: 1.2;
-	--text-title--letter-spacing: -0.02em;
+	--text-title--letter-spacing: -0.035em;
 	--text-title--font-weight: 650;
 	--text-headline: 1.125rem;
 	--text-headline--line-height: 1.35;
@@ -214,4 +214,11 @@
 /* Tabular figures for times, countdowns and counts. */
 @utility nums {
 	font-variant-numeric: tabular-nums;
+}
+
+/* Keep anchor targets clear of the two-row phone navigation. */
+@media (max-width: 63.999rem) {
+	[data-slot='section'] {
+		scroll-margin-top: 10rem;
+	}
 }

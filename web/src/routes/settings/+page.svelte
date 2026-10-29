@@ -135,128 +135,130 @@
 	/>
 {/if}
 
-<div class="space-y-8">
-	<Section
-		title="Passkeys"
-		count={passkeys.data?.length}
-		footnote="Lost every passkey? Run lor-server admin reset on the Lor LXC console."
-	>
-		{#snippet action()}
-			<Button size="sm" variant="ghost" onclick={() => (addOpen = true)}
-				><Plus /> Add passkey</Button
-			>
-		{/snippet}
-		{#if passkeys.isPending}
-			<ListSkeleton rows={2} />
-		{:else if passkeys.isError && !passkeys.data}
-			<ErrorState
-				error={passkeys.error}
-				fetching={passkeys.isFetching}
-				onretry={() => passkeys.refetch()}
-				variant="inset"
-			/>
-		{:else}
-			<List>
-				{#each passkeys.data ?? [] as p (p.id)}
-					<ListRow
-						subtitle="Added {formatTimestamp(Date.parse(p.created_at))}{p.last_used_at
-							? ` · used ${formatAgo(Date.parse(p.last_used_at), clock.now)}`
-							: ''}"
-					>
-						{#snippet leading()}<IconTile icon={KeyRound} tone="info" />{/snippet}
-						{#snippet titleContent()}
-							<span class="flex flex-wrap items-center gap-2">
-								{p.name}
-								{#if session.data?.passkey_name === p.name}<Badge tone="success">This session</Badge
-									>{/if}
-							</span>
-						{/snippet}
-						{#snippet trailing()}
-							<Button
-								size="icon-sm"
-								variant="ghost"
-								aria-label="Rename {p.name}"
-								onclick={() => {
-									renameFor = p;
-									renameTo = p.name;
-									renameOpen = true;
-								}}><Pencil /></Button
-							>
-							<Button
-								size="icon-sm"
-								variant="ghost"
-								class="text-destructive hover:text-destructive"
-								aria-label="Remove {p.name}"
-								title={onlyOne ? "The last passkey can't be removed" : undefined}
-								disabled={onlyOne}
-								onclick={() => {
-									removeFor = p;
-									removeOpen = true;
-								}}><Trash2 /></Button
-							>
-						{/snippet}
-					</ListRow>
-				{/each}
+<div class="grid items-start gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+	<div class="min-w-0 space-y-8">
+		<Section
+			title="Passkeys"
+			count={passkeys.data?.length}
+			footnote="Lost every passkey? Run lor-server admin reset on the Lor LXC console."
+		>
+			{#snippet action()}
+				<Button size="sm" variant="ghost" onclick={() => (addOpen = true)}
+					><Plus /> Add passkey</Button
+				>
+			{/snippet}
+			{#if passkeys.isPending}
+				<ListSkeleton rows={2} />
+			{:else if passkeys.isError && !passkeys.data}
+				<ErrorState
+					error={passkeys.error}
+					fetching={passkeys.isFetching}
+					onretry={() => passkeys.refetch()}
+					variant="inset"
+				/>
+			{:else}
+				<List>
+					{#each passkeys.data ?? [] as p (p.id)}
+						<ListRow
+							subtitle="Added {formatTimestamp(Date.parse(p.created_at))}{p.last_used_at
+								? ` · used ${formatAgo(Date.parse(p.last_used_at), clock.now)}`
+								: ''}"
+						>
+							{#snippet leading()}<IconTile icon={KeyRound} tone="info" />{/snippet}
+							{#snippet titleContent()}
+								<span class="flex flex-wrap items-center gap-2">
+									{p.name}
+									{#if session.data?.passkey_name === p.name}<Badge tone="success"
+											>This session</Badge
+										>{/if}
+								</span>
+							{/snippet}
+							{#snippet trailing()}
+								<Button
+									size="icon-sm"
+									variant="ghost"
+									aria-label="Rename {p.name}"
+									onclick={() => {
+										renameFor = p;
+										renameTo = p.name;
+										renameOpen = true;
+									}}><Pencil /></Button
+								>
+								<Button
+									size="icon-sm"
+									variant="ghost"
+									class="text-destructive hover:text-destructive"
+									aria-label="Remove {p.name}"
+									title={onlyOne ? "The last passkey can't be removed" : undefined}
+									disabled={onlyOne}
+									onclick={() => {
+										removeFor = p;
+										removeOpen = true;
+									}}><Trash2 /></Button
+								>
+							{/snippet}
+						</ListRow>
+					{/each}
+				</List>
+			{/if}
+		</Section>
+
+		<Section title="Sessions" count={sessions.data?.length}>
+			{#if sessions.isPending}
+				<ListSkeleton rows={2} />
+			{:else if sessions.isError && !sessions.data}
+				<ErrorState
+					error={sessions.error}
+					fetching={sessions.isFetching}
+					onretry={() => sessions.refetch()}
+					variant="inset"
+				/>
+			{:else}
+				<List>
+					{#each sessions.data ?? [] as s (s.id)}
+						{@const device = describeUserAgent(s.user_agent)}
+						<ListRow
+							subtitle={[
+								s.passkey_name,
+								`active ${formatAgo(Date.parse(s.last_seen_at), clock.now)}`,
+								s.forwarded_for
+							]
+								.filter(Boolean)
+								.join(' · ')}
+						>
+							{#snippet leading()}<IconTile
+									icon={DEVICE_ICONS[device.kind]}
+									tone={s.current ? 'success' : 'neutral'}
+								/>{/snippet}
+							{#snippet titleContent()}
+								<span class="flex flex-wrap items-center gap-2" title={s.user_agent}>
+									{device.label}
+									{#if s.current}<Badge tone="success">This browser</Badge>{/if}
+								</span>
+							{/snippet}
+						</ListRow>
+					{/each}
+				</List>
+			{/if}
+		</Section>
+
+		<Section>
+			<List label="Sign out">
+				<ListRow onclick={signOut} title="Sign out" density="compact">
+					{#snippet leading()}<IconTile icon={LogOut} size="sm" />{/snippet}
+				</ListRow>
+				<ListRow
+					onclick={() => (everywhereOpen = true)}
+					title="Sign out everywhere"
+					subtitle="Ends every session, including this one"
+					tone="danger"
+					density="compact"
+				>
+					{#snippet leading()}<IconTile icon={ShieldOff} tone="danger" size="sm" />{/snippet}
+				</ListRow>
 			</List>
-		{/if}
-	</Section>
-
-	<Section title="Sessions" count={sessions.data?.length}>
-		{#if sessions.isPending}
-			<ListSkeleton rows={2} />
-		{:else if sessions.isError && !sessions.data}
-			<ErrorState
-				error={sessions.error}
-				fetching={sessions.isFetching}
-				onretry={() => sessions.refetch()}
-				variant="inset"
-			/>
-		{:else}
-			<List>
-				{#each sessions.data ?? [] as s (s.id)}
-					{@const device = describeUserAgent(s.user_agent)}
-					<ListRow
-						subtitle={[
-							s.passkey_name,
-							`active ${formatAgo(Date.parse(s.last_seen_at), clock.now)}`,
-							s.forwarded_for
-						]
-							.filter(Boolean)
-							.join(' · ')}
-					>
-						{#snippet leading()}<IconTile
-								icon={DEVICE_ICONS[device.kind]}
-								tone={s.current ? 'success' : 'neutral'}
-							/>{/snippet}
-						{#snippet titleContent()}
-							<span class="flex flex-wrap items-center gap-2" title={s.user_agent}>
-								{device.label}
-								{#if s.current}<Badge tone="success">This browser</Badge>{/if}
-							</span>
-						{/snippet}
-					</ListRow>
-				{/each}
-			</List>
-		{/if}
-	</Section>
-
-	<Section>
-		<List label="Sign out">
-			<ListRow onclick={signOut} title="Sign out" density="compact">
-				{#snippet leading()}<IconTile icon={LogOut} size="sm" />{/snippet}
-			</ListRow>
-			<ListRow
-				onclick={() => (everywhereOpen = true)}
-				title="Sign out everywhere"
-				subtitle="Ends every session, including this one"
-				tone="danger"
-				density="compact"
-			>
-				{#snippet leading()}<IconTile icon={ShieldOff} tone="danger" size="sm" />{/snippet}
-			</ListRow>
-		</List>
-	</Section>
-
+		</Section>
+	</div>
 	{#if config}
 		<Section title="About this Lor" footnote="Set in lor-server.toml on the Lor LXC.">
 			<DescriptionList>

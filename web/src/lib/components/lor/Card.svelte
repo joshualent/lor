@@ -20,7 +20,7 @@
 <div
 	data-slot="card"
 	class={cn(
-		'rounded-xl bg-card',
+		'rounded-xl border border-border bg-card',
 		padding === 'md' && 'p-4',
 		padding === 'lg' && 'p-4 sm:p-5',
 		className

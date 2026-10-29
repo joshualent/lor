@@ -7,6 +7,13 @@
 	import { keys, fetchDashboard, fetchSession } from '#lib/queries.js';
 	import { api, call } from '#lib/api/client.js';
 	import EmptyState from './EmptyState.svelte';
+	import LorMark from './LorMark.svelte';
+	import House from '@lucide/svelte/icons/house';
+	import Server from '@lucide/svelte/icons/server';
+	import Bot from '@lucide/svelte/icons/bot';
+	import ScrollText from '@lucide/svelte/icons/scroll-text';
+	import Settings2 from '@lucide/svelte/icons/settings-2';
+	import LogOut from '@lucide/svelte/icons/log-out';
 	import CloudOff from '@lucide/svelte/icons/cloud-off';
 	import RotateCw from '@lucide/svelte/icons/rotate-cw';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -51,11 +58,11 @@
 	);
 
 	const nav = [
-		{ href: '/', label: 'Home' },
-		{ href: '/hosts', label: 'Hosts' },
-		{ href: '/agents', label: 'Agents' },
-		{ href: '/audit', label: 'Audit' },
-		{ href: '/settings', label: 'Settings' }
+		{ href: '/', label: 'Home', icon: House },
+		{ href: '/hosts', label: 'Hosts', icon: Server },
+		{ href: '/agents', label: 'Agents', icon: Bot },
+		{ href: '/audit', label: 'Audit', icon: ScrollText },
+		{ href: '/settings', label: 'Settings', icon: Settings2 }
 	];
 	function active(href: string) {
 		const p = page.url.pathname;
@@ -73,75 +80,114 @@
 	const ready = $derived(isPublic || session.data?.authenticated === true);
 </script>
 
-<div class="flex min-h-dvh flex-col">
+<div class="min-h-dvh">
+	<a
+		href="#main-content"
+		class="fixed top-3 left-3 z-50 -translate-y-24 rounded-md bg-primary px-4 py-3 text-primary-foreground focus:translate-y-0"
+		>Skip to content</a
+	>
 	{#if !isPublic && session.data?.authenticated}
 		<header
-			class="sticky top-0 z-30 border-b border-transparent bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/70"
+			class="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-md lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-52 lg:flex-col lg:border-r lg:border-b-0"
+			data-slot="app-navigation"
 		>
 			<div
-				class="mx-auto flex max-w-3xl items-center gap-3 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2.5 sm:gap-4 sm:px-6 sm:pt-5"
+				class="flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 sm:px-6 lg:px-5 lg:pt-7 lg:pb-8"
 			>
 				<a
 					href="/"
-					class="rounded-md text-lg font-semibold tracking-tight no-underline! focus-ring"
-					aria-label="Lor home">Lor</a
+					class="flex min-h-11 items-center gap-2.5 rounded-md no-underline! focus-ring"
+					aria-label="Lor home"
 				>
-				<nav
-					class="-mx-1 -my-1.5 no-scrollbar flex flex-1 gap-0.5 overflow-x-auto py-1.5 sm:gap-1"
-					aria-label="Main"
-				>
-					{#each nav as n (n.href)}
-						<a
-							href={n.href}
-							class="relative inline-flex items-center gap-1.5 rounded-md px-1.5 py-1.5 text-sm whitespace-nowrap no-underline! focus-ring transition-colors after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-[''] sm:px-2.5 {active(
-								n.href
-							)
-								? 'bg-secondary text-foreground'
-								: 'text-muted-foreground hover:text-foreground'}"
-							aria-current={active(n.href) ? 'page' : undefined}
-							>{n.label}{#if n.href === '/' && pending > 0}<span
-									class="grid h-4 min-w-4 place-items-center rounded-full bg-warning px-1 text-[0.6875rem] leading-none font-semibold text-primary-foreground nums"
-									aria-label="{pending} waiting">{pending}</span
-								>{/if}</a
-						>
-					{/each}
-				</nav>
-				<button
-					class="hidden rounded-md text-sm text-muted-foreground focus-ring transition-colors hover:text-foreground sm:block"
+					<LorMark class="size-9" />
+					<span class="text-headline font-semibold tracking-tight"
+						>Lor<span
+							class="ml-2 text-footnote font-normal tracking-normal text-muted-foreground lg:mt-0.5 lg:ml-0 lg:block"
+							>Access control</span
+						></span
+					>
+				</a>
+				<Button
+					variant="ghost"
+					size="icon"
+					aria-label="Sign out"
 					onclick={signOut}
+					class="lg:hidden"><LogOut /></Button
 				>
-					Sign out
-				</button>
+			</div>
+			<nav
+				class="grid grid-cols-5 gap-1 px-3 pb-3 sm:px-5 lg:flex lg:flex-col lg:gap-1.5 lg:px-3"
+				aria-label="Main"
+			>
+				{#each nav as n (n.href)}
+					<a
+						href={n.href}
+						class="relative flex min-h-12 flex-col items-center justify-center gap-1 rounded-md px-1 py-2 text-caption font-medium no-underline! focus-ring transition-colors lg:min-h-11 lg:flex-row lg:justify-start lg:gap-3 lg:px-3 lg:text-callout {active(
+							n.href
+						)
+							? 'bg-secondary text-foreground'
+							: 'text-muted-foreground hover:bg-card hover:text-foreground'}"
+						aria-current={active(n.href) ? 'page' : undefined}
+					>
+						<n.icon class="size-[1.125rem] shrink-0" aria-hidden="true" />
+						<span>{n.label}</span>
+						{#if n.href === '/' && pending > 0}<span
+								class="absolute top-1 right-1 grid min-w-4 place-items-center rounded-full bg-warning px-1 text-caption leading-4 font-semibold text-primary-foreground nums lg:static lg:ml-auto"
+								aria-label="{pending} waiting">{pending}</span
+							>{/if}
+					</a>
+				{/each}
+			</nav>
+			<div class="mt-auto hidden space-y-4 p-4 lg:block">
+				<p
+					class="border-t border-border px-2 pt-4 text-footnote leading-relaxed text-muted-foreground"
+				>
+					Temporary access.<br />Your approval. Your control.
+				</p>
+				<Button variant="ghost" onclick={signOut} class="w-full justify-start text-muted-foreground"
+					><LogOut /> Sign out</Button
+				>
 			</div>
 		</header>
 	{/if}
-	<main class="mx-auto w-full max-w-3xl flex-1 px-4 pt-4 pb-16 sm:px-6 sm:pt-6">
-		{#if ready}
-			{@render children()}
-		{:else if session.isError}
-			<EmptyState
-				icon={CloudOff}
-				tone="danger"
-				variant="page"
-				title="Can't reach Lor"
-				description="Check that the server is running and your connection is up."
-				role="alert"
-			>
-				{#snippet action()}
-					<Button
-						variant="secondary"
-						disabled={session.isFetching}
-						onclick={() => session.refetch()}
-						>{#if session.isFetching}<Spinner />{:else}<RotateCw />{/if} Try again</Button
-					>
-				{/snippet}
-			</EmptyState>
-		{:else}
-			<div class="flex min-h-[50dvh] items-center justify-center" role="status">
-				<p class="flex items-center gap-2 text-callout text-muted-foreground">
-					<Spinner class="size-4" /> Checking your session…
-				</p>
-			</div>
-		{/if}
-	</main>
+	<div class={!isPublic && session.data?.authenticated ? 'lg:pl-52' : ''}>
+		<main
+			id="main-content"
+			tabindex="-1"
+			class="mx-auto w-full flex-1 px-4 pt-6 pb-12 outline-none sm:px-6 sm:pt-8 lg:px-8 lg:pt-10 {isPublic
+				? 'max-w-3xl'
+				: page.url.pathname === '/' ||
+					  ['/hosts', '/agents', '/audit', '/settings'].includes(page.url.pathname)
+					? 'max-w-7xl'
+					: 'max-w-3xl'}"
+		>
+			{#if ready}
+				{@render children()}
+			{:else if session.isError}
+				<EmptyState
+					icon={CloudOff}
+					tone="danger"
+					variant="page"
+					title="Can't reach Lor"
+					description="Check that the server is running and your connection is up."
+					role="alert"
+				>
+					{#snippet action()}
+						<Button
+							variant="secondary"
+							disabled={session.isFetching}
+							onclick={() => session.refetch()}
+							>{#if session.isFetching}<Spinner />{:else}<RotateCw />{/if} Try again</Button
+						>
+					{/snippet}
+				</EmptyState>
+			{:else}
+				<div class="flex min-h-[50dvh] items-center justify-center" role="status">
+					<p class="flex items-center gap-2 text-callout text-muted-foreground">
+						<Spinner class="size-4" /> Checking your session…
+					</p>
+				</div>
+			{/if}
+		</main>
+	</div>
 </div>

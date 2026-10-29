@@ -67,7 +67,7 @@ export const buttonVariants = tv({
 		},
 		size: {
 			default: 'h-10 gap-2 px-4',
-			sm: "h-8 gap-1.5 px-3 text-[13px] after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-['']",
+			sm: "h-8 gap-1.5 px-3 text-footnote after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-['']",
 			lg: 'h-12 gap-2 px-5 text-base',
 			icon: 'size-10',
 			'icon-sm': "size-8 after:absolute after:-inset-1.5 after:content-['']"
@@ -166,7 +166,7 @@ export const calloutVariants = tv({
 
 /** The grouped ("inset") list surface. */
 export const listVariants = tv({
-	base: 'overflow-hidden rounded-xl bg-card',
+	base: 'overflow-hidden rounded-xl border border-border bg-card',
 	variants: {
 		divided: { true: 'divide-y divide-separator', false: '' }
 	},
@@ -201,9 +201,9 @@ export const listRowVariants = tv({
 		},
 		hasTrailing: { true: { main: 'pr-2' }, false: {} },
 		density: {
-			default: { main: 'min-h-14 py-3' },
+			default: { main: 'min-h-16 py-3.5' },
 			compact: { main: 'min-h-11 py-2' },
-			relaxed: { main: 'min-h-16 py-3.5' }
+			relaxed: { main: 'min-h-20 py-4' }
 		},
 		tone: {
 			default: {},
@@ -275,4 +275,16 @@ export const skeletonVariants = tv({
 		shape: { line: 'h-3.5', block: '', circle: 'rounded-full', tile: 'size-9 rounded-[0.6rem]' }
 	},
 	defaultVariants: { shape: 'line' }
+});
+
+// ---------------------------------------------------------- linked summary
+
+export const summaryCardVariants = tv({
+	slots: {
+		root: 'group flex min-w-0 flex-col rounded-xl border border-border bg-card p-3.5 no-underline! focus-ring transition-colors hover:bg-card-hover sm:p-5',
+		label:
+			'flex min-h-9 items-start justify-between gap-2 text-footnote font-medium text-muted-foreground sm:min-h-0 sm:items-center',
+		value: 'mt-2 text-title nums',
+		description: 'mt-1 hidden text-footnote text-muted-foreground sm:block'
+	}
 });

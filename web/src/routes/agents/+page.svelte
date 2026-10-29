@@ -33,11 +33,20 @@
 	import ListSkeleton from '#lib/components/lor/ListSkeleton.svelte';
 	import PageHeader from '#lib/components/lor/PageHeader.svelte';
 	import StaleNotice from '#lib/components/lor/StaleNotice.svelte';
+	import SearchField from '#lib/components/lor/SearchField.svelte';
 
 	const qc = useQueryClient();
 	const agents = createQuery(() => ({ queryKey: keys.agents, queryFn: fetchAgents }));
 	const refresh = () => qc.invalidateQueries({ queryKey: keys.agents });
 
+	let search = $state('');
+	const matching = $derived(
+		(agents.data ?? []).filter(
+			(a) =>
+				!search.trim() ||
+				`${a.name} ${a.lan_addrs.join(' ')}`.toLowerCase().includes(search.trim().toLowerCase())
+		)
+	);
 	let addOpen = $state(false);
 	let name = $state('');
 	let ip = $state('');
@@ -147,7 +156,7 @@
 	});
 </script>
 
-<PageHeader title="Agents" {subtitle}>
+<PageHeader title="Agents" subtitle="Manage the agents that can ask for access to your hosts.">
 	{#snippet actions()}<Button onclick={() => (addOpen = true)}><Plus /> Add agent</Button>{/snippet}
 </PageHeader>
 
@@ -189,27 +198,41 @@
 				>{/snippet}
 		</EmptyState>
 	{:else if agents.data}
-		<List>
-			{#each agents.data as a (a.id)}
-				{@const look = agentLook(a)}
-				<ListRow onclick={() => openSheet(a)} chevron disabled={false}>
-					{#snippet leading()}<IconTile text={a.name} tone={look.tone} />{/snippet}
-					{#snippet titleContent()}
-						<span class={a.status === 'disabled' ? 'text-muted-foreground' : ''}>{a.name}</span>
-					{/snippet}
-					{#snippet subtitleContent()}
-						<span class="font-mono text-footnote">{a.lan_addrs.join(', ')}</span>
-					{/snippet}
-					{#snippet metaContent()}
-						{#if look.badge}
-							<Badge tone={look.badge.tone}>{look.badge.label}</Badge>
-						{:else if a.last_seen_at}
-							<span>seen {formatAgo(Date.parse(a.last_seen_at), clock.now)}</span>
-						{/if}
-					{/snippet}
-				</ListRow>
-			{/each}
-		</List>
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<p class="text-callout text-muted-foreground">{subtitle}</p>
+			<SearchField
+				bind:value={search}
+				label="Filter agents"
+				placeholder="Find an agent by name or IP…"
+				class="w-full sm:w-72"
+			/>
+		</div>
+		{#if matching.length === 0}<EmptyState
+				title="No matching agents"
+				description="Try another name or address."
+			/>{:else}
+			<List>
+				{#each matching as a (a.id)}
+					{@const look = agentLook(a)}
+					<ListRow onclick={() => openSheet(a)} chevron disabled={false}>
+						{#snippet leading()}<IconTile text={a.name} tone={look.tone} />{/snippet}
+						{#snippet titleContent()}
+							<span class={a.status === 'disabled' ? 'text-muted-foreground' : ''}>{a.name}</span>
+						{/snippet}
+						{#snippet subtitleContent()}
+							<span class="font-mono text-footnote">{a.lan_addrs.join(', ')}</span>
+						{/snippet}
+						{#snippet metaContent()}
+							{#if look.badge}
+								<Badge tone={look.badge.tone}>{look.badge.label}</Badge>
+							{:else if a.last_seen_at}
+								<span>seen {formatAgo(Date.parse(a.last_seen_at), clock.now)}</span>
+							{/if}
+						{/snippet}
+					</ListRow>
+				{/each}
+			</List>
+		{/if}
 	{/if}
 </div>
 

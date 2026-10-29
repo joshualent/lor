@@ -1,5 +1,7 @@
 <script lang="ts">
 	import Plus from '@lucide/svelte/icons/plus';
+	import Send from '@lucide/svelte/icons/send';
+	import SummaryCard from '#lib/components/lor/SummaryCard.svelte';
 	import Inbox from '@lucide/svelte/icons/inbox';
 	import TimerReset from '@lucide/svelte/icons/timer-reset';
 	import Clock from '@lucide/svelte/icons/clock';
@@ -77,37 +79,12 @@
 	const pendingCount = $derived(
 		(d?.pending_requests.length ?? 0) + (d?.pending_extensions.length ?? 0)
 	);
-	// Quick links to the sections ("4 waiting · 3 active · 1 offered").
-	const summary = $derived.by(() => {
-		if (!d) return [];
-		return [
-			{ href: '#waiting', n: pendingCount, label: 'waiting for you' },
-			{ href: '#active', n: d.active.length, label: 'active' },
-			{ href: '#offers', n: d.offered.length, label: 'offered' }
-		].filter((x) => x.n > 0);
-	});
 	const hasCommands = $derived(!!d?.active.some((g) => g.last_command));
 	let revoking = $state(false);
 </script>
 
-<PageHeader
-	title="Home"
-	subtitle={d && summary.length === 0 ? 'Nothing needs you right now.' : undefined}
->
+<PageHeader title="Home" subtitle="Review requests and keep track of temporary access.">
 	{#snippet actions()}<Button href="/grants/new"><Plus /> Grant access</Button>{/snippet}
-	{#snippet meta()}
-		{#if summary.length}
-			<nav aria-label="Summary" class="-mt-2 flex flex-wrap gap-x-3 gap-y-1 text-callout">
-				{#each summary as x (x.href)}
-					<a
-						href={x.href}
-						class="-mx-1 rounded-md px-1 py-1.5 text-muted-foreground no-underline! focus-ring hover:text-foreground"
-						><span class="font-medium text-foreground nums">{x.n}</span> {x.label}</a
-					>
-				{/each}
-			</nav>
-		{/if}
-	{/snippet}
 </PageHeader>
 
 {#snippet grantActions(g: Summary, cls: string)}
@@ -147,161 +124,201 @@
 {:else if q.isError && !q.data}
 	<ErrorState error={q.error} fetching={q.isFetching} onretry={() => q.refetch()} />
 {:else if d}
-	<div class="space-y-8">
-		{#if pendingCount > 0}
-			<Section
-				id="waiting"
-				title="Waiting for you"
-				count={pendingCount}
-				description="Reasons are written by the agents and unverified."
-			>
-				<List data-testid="pending">
-					{#each d.pending_requests as g (g.id)}
-						<ListRow href="/r/{g.id}" density="relaxed">
-							{#snippet leading()}<IconTile icon={Inbox} tone="warning" />{/snippet}
-							{#snippet titleContent()}
-								<span class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-									<span>{g.agent.name}</span>
-									<span class="font-normal text-muted-foreground">wants</span>
-									<LevelBadge level={g.requested_level} short />
-									<span class="font-normal text-muted-foreground">on</span>
-									<span>{g.host.name}</span>
-									{#each hostLook(g.host).badges as b (b.label)}<Badge tone={b.tone}
-											>{b.label}</Badge
-										>{/each}
-								</span>
-							{/snippet}
-							{#snippet subtitleContent()}
-								<span class="line-clamp-2">“{g.reason}”</span>
-								<span class="mt-1 flex items-center gap-1.5 text-footnote">
-									<Clock class="size-3.5 shrink-0" aria-hidden="true" />
-									{[
-										`for ${formatDuration(g.requested_duration_s ?? 0)}`,
-										g.approval_deadline
-											? `${formatCountdown(Date.parse(g.approval_deadline), clock.now)} to decide`
-											: undefined
-									]
-										.filter(Boolean)
-										.join(' · ')}
-								</span>
-							{/snippet}
-						</ListRow>
-					{/each}
-					{#each d.pending_extensions as x (x.extension.id)}
-						<ListRow href="/e/{x.extension.id}" density="relaxed">
-							{#snippet leading()}<IconTile icon={TimerReset} tone="warning" />{/snippet}
-							{#snippet titleContent()}
-								{x.grant.agent.name}
-								<span class="font-normal text-muted-foreground">wants more time on</span>
-								{x.grant.host.name}
-								{#each hostLook(x.grant.host).badges as b (b.label)}<Badge
-										tone={b.tone}
-										class="ml-1">{b.label}</Badge
-									>{/each}
-							{/snippet}
-							{#snippet subtitleContent()}
-								<span class="line-clamp-2">“{x.extension.reason}”</span>
-								<span class="mt-1 flex items-center gap-1.5 text-footnote">
-									<Clock class="size-3.5 shrink-0" aria-hidden="true" />
-									+{formatDuration(x.extension.requested_duration_s)}
-								</span>
-							{/snippet}
-						</ListRow>
-					{/each}
-				</List>
-			</Section>
-		{/if}
-
-		{#snippet grantRow(g: Summary)}
-			{@const look = hostLook(g.host)}
-			<ListRow
-				href="/grants/{g.id}"
-				label="{g.host.name}, {g.agent.name}{g.level === 'sudo' ? ', sudo' : ''}{g.status ===
-				'offered'
-					? ', offer not claimed yet'
-					: ''}"
-			>
-				{#snippet leading()}<IconTile icon={look.icon} tone={look.tone} />{/snippet}
-				{#snippet titleContent()}
-					<span class="flex flex-wrap items-center gap-x-2 gap-y-1">
-						{g.host.name}
-						{#if g.level === 'sudo'}<LevelBadge level="sudo" short />{/if}
-					</span>
-				{/snippet}
-				{#snippet subtitleContent()}
-					{[
-						g.agent.name,
-						g.status === 'offered' ? 'not claimed yet' : undefined,
-						g.last_command
-							? `ran a command ${formatAgo(Date.parse(g.last_command.reported_at), clock.now)}`
-							: undefined
-					]
-						.filter(Boolean)
-						.join(' · ')}
-				{/snippet}
-				{#snippet metaContent()}
-					{#if g.status === 'offered'}<StatusBadge status="offered" />{/if}
-					<Countdown end={g.valid_before} variant="badge" />
-				{/snippet}
-				{#snippet trailing()}
-					{@render grantActions(g, 'hidden gap-1 sm:flex')}
-				{/snippet}
-				{#if g.last_command}
-					<p class="-mt-1.5 flex min-w-0 gap-1.5 pr-4 pb-3 pl-16 text-footnote">
-						<SquareTerminal
-							class="mt-0.5 size-3.5 shrink-0 text-icon-muted"
-							aria-label="Last command"
-						/>
-						<code class="line-clamp-2 min-w-0 wrap-anywhere text-foreground/85"
-							>{formatArgv(g.last_command.argv)}</code
-						>
-					</p>
-				{/if}
-				{@render grantActions(g, 'flex gap-1 px-4 pb-3 pl-16 sm:hidden')}
-			</ListRow>
-		{/snippet}
-
-		<Section
-			id="active"
-			title="Active"
-			count={d.active.length || undefined}
-			description={hasCommands
-				? 'Last commands are reported by the agents and unverified.'
-				: undefined}
-		>
-			{#if d.active.length === 0}
-				<EmptyState
-					icon={ShieldCheck}
-					title="No agent has access"
-					description="Access starts when you approve a request or grant it ahead of time."
+	<nav class="mb-8 grid grid-cols-3 gap-2 sm:gap-4" aria-label="Summary">
+		<SummaryCard
+			href="#waiting"
+			label="Waiting for you"
+			value={pendingCount}
+			description="Requests to review"
+			icon={Inbox}
+			tone="warning"
+		/>
+		<SummaryCard
+			href="#active"
+			label="Active access"
+			value={d.active.length}
+			description="Grants in progress"
+			icon={ShieldCheck}
+			tone="success"
+		/>
+		<SummaryCard
+			href="#offers"
+			label="Open offers"
+			value={d.offered.length}
+			description="Ready for an agent to claim"
+			icon={Send}
+			tone="info"
+		/>
+	</nav>
+	<div class="grid items-start gap-8 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+		<div class="min-w-0 space-y-8">
+			{#if pendingCount > 0}
+				<Section
+					id="waiting"
+					title="Waiting for you"
+					count={pendingCount}
+					description="Reasons are written by the agents and unverified."
 				>
-					{#snippet action()}
-						{#if d.offered.length === 0}
-							<Button variant="secondary" href="/grants/new"><Plus /> Grant access</Button>
-						{/if}
-					{/snippet}
-				</EmptyState>
+					<List data-testid="pending">
+						{#each d.pending_requests as g (g.id)}
+							<ListRow href="/r/{g.id}" density="relaxed">
+								{#snippet leading()}<IconTile icon={Inbox} tone="warning" />{/snippet}
+								{#snippet titleContent()}
+									<span class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+										<span>{g.agent.name}</span>
+										<span class="font-normal text-muted-foreground">wants</span>
+										<LevelBadge level={g.requested_level} short />
+										<span class="font-normal text-muted-foreground">on</span>
+										<span>{g.host.name}</span>
+										{#each hostLook(g.host).badges as b (b.label)}<Badge tone={b.tone}
+												>{b.label}</Badge
+											>{/each}
+									</span>
+								{/snippet}
+								{#snippet subtitleContent()}
+									<span class="line-clamp-2">“{g.reason}”</span>
+									<span class="mt-1 flex items-center gap-1.5 text-footnote">
+										<Clock class="size-3.5 shrink-0" aria-hidden="true" />
+										{[
+											`for ${formatDuration(g.requested_duration_s ?? 0)}`,
+											g.approval_deadline
+												? `${formatCountdown(Date.parse(g.approval_deadline), clock.now)} to decide`
+												: undefined
+										]
+											.filter(Boolean)
+											.join(' · ')}
+									</span>
+								{/snippet}
+							</ListRow>
+						{/each}
+						{#each d.pending_extensions as x (x.extension.id)}
+							<ListRow href="/e/{x.extension.id}" density="relaxed">
+								{#snippet leading()}<IconTile icon={TimerReset} tone="warning" />{/snippet}
+								{#snippet titleContent()}
+									{x.grant.agent.name}
+									<span class="font-normal text-muted-foreground">wants more time on</span>
+									{x.grant.host.name}
+									{#each hostLook(x.grant.host).badges as b (b.label)}<Badge
+											tone={b.tone}
+											class="ml-1">{b.label}</Badge
+										>{/each}
+								{/snippet}
+								{#snippet subtitleContent()}
+									<span class="line-clamp-2">“{x.extension.reason}”</span>
+									<span class="mt-1 flex items-center gap-1.5 text-footnote">
+										<Clock class="size-3.5 shrink-0" aria-hidden="true" />
+										+{formatDuration(x.extension.requested_duration_s)}
+									</span>
+								{/snippet}
+							</ListRow>
+						{/each}
+					</List>
+				</Section>
 			{:else}
-				<List data-testid="active-grants">
-					{#each d.active as g (g.id)}{@render grantRow(g)}{/each}
-				</List>
+				<Section id="waiting" title="Waiting for you" count={0}>
+					<EmptyState
+						icon={Inbox}
+						title="You're all caught up"
+						description="New access requests and extensions appear here for your review."
+					/>
+				</Section>
 			{/if}
-		</Section>
+		</div>
+		<div class="min-w-0 space-y-8">
+			{#snippet grantRow(g: Summary)}
+				{@const look = hostLook(g.host)}
+				<ListRow
+					href="/grants/{g.id}"
+					label="{g.host.name}, {g.agent.name}{g.level === 'sudo' ? ', sudo' : ''}{g.status ===
+					'offered'
+						? ', offer not claimed yet'
+						: ''}"
+				>
+					{#snippet leading()}<IconTile icon={look.icon} tone={look.tone} />{/snippet}
+					{#snippet titleContent()}
+						<span class="flex flex-wrap items-center gap-x-2 gap-y-1">
+							{g.host.name}
+							{#if g.level === 'sudo'}<LevelBadge level="sudo" short />{/if}
+						</span>
+					{/snippet}
+					{#snippet subtitleContent()}
+						{[
+							g.agent.name,
+							g.status === 'offered' ? 'not claimed yet' : undefined,
+							g.last_command
+								? `ran a command ${formatAgo(Date.parse(g.last_command.reported_at), clock.now)}`
+								: undefined
+						]
+							.filter(Boolean)
+							.join(' · ')}
+					{/snippet}
+					{#snippet metaContent()}
+						{#if g.status === 'offered'}<StatusBadge status="offered" />{/if}
+						<Countdown end={g.valid_before} variant="badge" />
+					{/snippet}
+					{#if g.last_command}
+						<p class="-mt-1.5 flex min-w-0 gap-1.5 pr-4 pb-3 pl-16 text-footnote">
+							<SquareTerminal
+								class="mt-0.5 size-3.5 shrink-0 text-icon-muted"
+								aria-label="Last command"
+							/>
+							<code class="line-clamp-2 min-w-0 wrap-anywhere text-foreground/85"
+								>{formatArgv(g.last_command.argv)}</code
+							>
+						</p>
+					{/if}
+					{@render grantActions(g, 'flex gap-3 px-4 pt-1 pb-4 pl-16')}
+				</ListRow>
+			{/snippet}
 
-		{#if d.offered.length}
 			<Section
-				id="offers"
-				title="Offers"
-				count={d.offered.length}
-				footnote="Pre-approved access. The agent claims it on its next lor ssh or lor request."
+				id="active"
+				title="Active"
+				count={d.active.length || undefined}
+				description={hasCommands
+					? 'Last commands are reported by the agents and unverified.'
+					: undefined}
 			>
-				<List data-testid="offers">
-					{#each d.offered as g (g.id)}{@render grantRow(g)}{/each}
-				</List>
+				{#if d.active.length === 0}
+					<EmptyState
+						icon={ShieldCheck}
+						title="No agent has access"
+						description="Access starts when you approve a request or grant it ahead of time."
+					>
+						{#snippet action()}
+							{#if d.offered.length === 0}
+								<Button variant="secondary" href="/grants/new"><Plus /> Grant access</Button>
+							{/if}
+						{/snippet}
+					</EmptyState>
+				{:else}
+					<List data-testid="active-grants">
+						{#each d.active as g (g.id)}{@render grantRow(g)}{/each}
+					</List>
+				{/if}
 			</Section>
-		{/if}
 
-		<Section title="Recent activity">
+			{#if d.offered.length}
+				<Section
+					id="offers"
+					title="Offers"
+					count={d.offered.length}
+					footnote="Pre-approved access. The agent claims it on its next lor ssh or lor request."
+				>
+					<List data-testid="offers">
+						{#each d.offered as g (g.id)}{@render grantRow(g)}{/each}
+					</List>
+				</Section>
+			{:else}
+				<Section id="offers" title="Offers" count={0}
+					><p class="text-callout text-muted-foreground">
+						No open offers. <a href="/grants/new" class="text-primary">Grant access</a> before an agent
+						asks.
+					</p></Section
+				>
+			{/if}
+		</div>
+		<Section class="xl:col-span-2" title="Recent activity">
 			{#snippet action()}
 				<Button variant="ghost" size="sm" href="/audit" class="text-muted-foreground"
 					>View all</Button

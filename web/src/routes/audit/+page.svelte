@@ -102,7 +102,11 @@
 <PageHeader
 	title="Audit log"
 	subtitle="Everything Lor did and who asked. Append-only, newest first."
-/>
+>
+	{#snippet actions()}{#if filtered}<Button variant="secondary" onclick={clear}
+				>Clear filters</Button
+			>{/if}{/snippet}
+</PageHeader>
 
 <Toolbar label="Filters">
 	<SegmentedControl

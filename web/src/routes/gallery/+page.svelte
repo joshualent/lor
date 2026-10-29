@@ -57,6 +57,7 @@
 	import SettingsRow from '#lib/components/lor/SettingsRow.svelte';
 	import StaleNotice from '#lib/components/lor/StaleNotice.svelte';
 	import StatusBadge from '#lib/components/lor/StatusBadge.svelte';
+	import SummaryCard from '#lib/components/lor/SummaryCard.svelte';
 	import StatusDot from '#lib/components/lor/StatusDot.svelte';
 	import TimeBar from '#lib/components/lor/TimeBar.svelte';
 	import Timeline from '#lib/components/lor/Timeline.svelte';
@@ -74,7 +75,7 @@
 		'separator'
 	];
 	const SIZES = [
-		['title', 'Page title · 26/650'],
+		['title', 'Page title · 30/650'],
 		['headline', 'Headline · 18/600'],
 		['heading', 'Section heading · 15/600'],
 		['body', 'Body · 15/400'],
@@ -214,6 +215,34 @@
 
 <div class="space-y-12">
 	<!-- ------------------------------------------------------------- tokens -->
+	<Section title="Linked summaries">
+		<div class="grid grid-cols-3 gap-2 sm:gap-4">
+			<SummaryCard
+				href="#"
+				label="Waiting for you"
+				value={4}
+				description="Requests to review"
+				icon={Inbox}
+				tone="warning"
+			/>
+			<SummaryCard
+				href="#"
+				label="Active access"
+				value={3}
+				description="Grants in progress"
+				icon={Server}
+				tone="success"
+			/>
+			<SummaryCard
+				href="#"
+				label="Open offers"
+				value={0}
+				description="Ready to claim"
+				icon={KeyRound}
+				tone="info"
+			/>
+		</div>
+	</Section>
 	<Section title="Surfaces" description="Elevation by lightness, not shadow.">
 		<div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
 			{#each SURFACES as s (s)}

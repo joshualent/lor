@@ -395,3 +395,31 @@ test('screens', async () => {
 		if (res?.ok()) await shoot('gallery', '/gallery');
 	}
 });
+
+// Extra layout evidence for independent reviews: narrow phone, tablet and
+// wide desktop. Keep this beside the seeded screen suite so it uses the
+// same realistic data and does not depend on a live environment.
+test('responsive checkpoints', async () => {
+	for (const width of [320, 768, 1440]) {
+		await page.setViewportSize({ width, height: 900 });
+		for (const [name, path] of [
+			['dashboard', '/'],
+			['hosts', '/hosts'],
+			['agents', '/agents'],
+			['settings', '/settings'],
+			['audit', '/audit'],
+			['consent', `/r/${ids.mediaPending}`]
+		]) {
+			await page.goto(path);
+			await settle(page);
+			const overflow = await page.evaluate(
+				() => document.documentElement.scrollWidth - document.documentElement.clientWidth
+			);
+			expect(overflow, `${name} at ${width}px`).toBeLessThanOrEqual(0);
+			await page.screenshot({
+				path: join(out, `${name}-${width}.png`),
+				fullPage: true
+			});
+		}
+	}
+});
