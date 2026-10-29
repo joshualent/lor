@@ -36,6 +36,11 @@ styling lives in one place and pages read like an outline of the screen.
 5. **Say it in text, too.** Every status color has a label; every icon-only
    button has an `aria-label`.
 
+The brand mark is the approved blue star over a yellow gear in
+`web/static/favicon.svg`. `LorMark` uses this same asset on sign-in, setup and
+the desktop sidebar. Keep its cache version in sync with the favicon link
+in `web/src/app.html` when replacing the artwork.
+
 ## Tokens
 
 All tokens are CSS custom properties in `:root` and mapped into Tailwind's
