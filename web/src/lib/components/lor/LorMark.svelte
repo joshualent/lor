@@ -7,7 +7,7 @@
 </script>
 
 <img
-	src={`${asset('favicon.svg')}?v=e11f4261`}
+	src={`${asset('favicon.svg')}?v=fa3aa323`}
 	alt=""
 	width="56"
 	height="56"

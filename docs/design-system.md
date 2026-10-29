@@ -40,6 +40,8 @@ The brand mark is the approved blue star over a yellow gear in
 `web/static/favicon.svg`. `LorMark` uses this same asset on sign-in, setup and
 the desktop sidebar. Keep its cache version in sync with the favicon link
 in `web/src/app.html` when replacing the artwork.
+Its view box leaves only a small margin around the star tips; the gear is
+optically enlarged so the shared mark remains legible at 16 px.
 
 ## Tokens
 
