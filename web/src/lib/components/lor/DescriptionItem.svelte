@@ -13,7 +13,7 @@
 		action
 	}: {
 		label: string;
-		layout?: 'inline' | 'stacked';
+		layout?: 'inline' | 'stacked' | 'responsive';
 		/** Monospace value (addresses, fingerprints, commands). */
 		mono?: boolean;
 		children: Snippet;
@@ -26,14 +26,18 @@
 	data-slot="description-item"
 	class={cn(
 		'flex min-h-12 gap-x-4 gap-y-1 px-4 py-3',
-		layout === 'inline' ? 'items-baseline justify-between' : 'flex-col'
+		layout === 'inline'
+			? 'items-baseline justify-between'
+			: layout === 'responsive'
+				? 'flex-col sm:flex-row sm:items-baseline sm:justify-between'
+				: 'flex-col'
 	)}
 >
 	<dt class="shrink-0 text-callout text-muted-foreground">{label}</dt>
 	<dd
 		class={cn(
 			'min-w-0 break-words text-foreground',
-			layout === 'inline' ? 'text-right' : '',
+			layout === 'inline' ? 'text-right' : layout === 'responsive' ? 'text-left sm:text-right' : '',
 			mono ? 'font-mono text-callout wrap-anywhere' : 'text-body'
 		)}
 	>

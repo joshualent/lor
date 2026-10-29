@@ -320,11 +320,11 @@ test('screens', async () => {
 	// What a phone shows first: the sticky action bar in place.
 	await shoot('consent-sudo-infra-viewport', `/r/${ids.caddy}`, {
 		fullPage: false,
-		widths: ['phone']
+		widths: ['desktop', 'phone']
 	});
 	await shoot('consent-user-viewport', `/r/${ids.mediaPending}`, {
 		fullPage: false,
-		widths: ['phone']
+		widths: ['desktop', 'phone']
 	});
 	await shoot('consent-deny', `/r/${ids.mediaPending}`, {
 		fullPage: false,
@@ -429,5 +429,35 @@ test('responsive checkpoints', async () => {
 				fullPage: true
 			});
 		}
+	}
+});
+
+test('grant identity and consent focus remain clear in compact windows', async () => {
+	await page.setViewportSize(DESKTOP);
+	await page.goto('/');
+	const sudo = page.getByRole('button', { name: `Extend nas for codex, sudo, grant #${ids.nas}`, exact: true });
+	const user = page.getByRole('button', { name: `Extend nas for claude, standard user, grant #${ids.nasUser}`, exact: true });
+	await expect(sudo).toHaveCount(1);
+	await expect(user).toHaveCount(1);
+	await expect(page.locator(`a[href="/grants/${ids.nas}"]`).first()).toHaveAccessibleName(/remaining/);
+	await sudo.click();
+	await expect(page.getByText(`codex · sudo (root) · Grant #${ids.nas}`, { exact: true })).toBeVisible();
+	await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+	for (const size of [{ width: 320, height: 568 }, { width: 390, height: 620 }, PHONE]) {
+		await page.setViewportSize(size);
+		await page.goto(`/r/${ids.mediaPending}`);
+		await page.getByRole('link', { name: 'Change access', exact: true }).click();
+		const radio = page.getByRole('radio', { name: /Standard user/ });
+		await radio.focus();
+		const card = page.locator('label').filter({ has: radio });
+		await expect(card).toBeInViewport();
+		const box = await card.boundingBox();
+		const navigation = await page.locator('[data-slot="app-navigation"]').boundingBox();
+		const bar = page.locator('[data-slot="action-bar"]');
+		const position = await bar.evaluate((el) => getComputedStyle(el).position);
+		const actions = await bar.boundingBox();
+		expect(box!.y).toBeGreaterThanOrEqual(navigation!.y + navigation!.height);
+		expect(box!.y + box!.height).toBeLessThanOrEqual(position === 'sticky' ? actions!.y : size.height);
+		await page.screenshot({ path: join(out, `consent-focused-${size.width}-${size.height}.png`) });
 	}
 });

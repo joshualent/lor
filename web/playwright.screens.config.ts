@@ -6,6 +6,8 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
 	testDir: '../test/screens',
 	testMatch: '**/*.screens.ts',
+	// Keep screenshots and E2E traces independent when both suites run.
+	outputDir: '../test/screens/.tmp/results',
 	globalSetup: '../test/screens/global-setup.ts',
 	fullyParallel: false,
 	workers: 1,

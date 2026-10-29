@@ -135,7 +135,9 @@
 						<span>{n.label}</span>
 						{#if n.href === '/' && pending > 0}<span
 								class="absolute top-1 right-1 grid min-w-4 place-items-center rounded-full bg-warning px-1 text-caption leading-4 font-semibold text-primary-foreground nums lg:static lg:ml-auto"
-								aria-label="{pending} waiting">{pending}</span
+								><span aria-hidden="true">{pending}</span><span class="sr-only"
+									>{pending} waiting for review</span
+								></span
 							>{/if}
 					</a>
 				{/each}

@@ -224,3 +224,21 @@
 		scroll-margin-top: 6rem;
 	}
 }
+
+/* Keep focused choices clear of phone navigation and decision actions. */
+@layer base {
+	html {
+		scroll-padding-top: 6rem;
+		scroll-padding-bottom: 11rem;
+	}
+	@media (min-width: 1024px) {
+		html {
+			scroll-padding-top: 2rem;
+		}
+	}
+	@media (max-width: 359px), (max-height: 699px) {
+		html {
+			scroll-padding-bottom: 2rem;
+		}
+	}
+}

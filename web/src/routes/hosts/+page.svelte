@@ -91,7 +91,7 @@
 	<List label="Hosts">
 		{#each list as h (h.id)}
 			{@const look = hostLook(h, true)}
-			<ListRow href="/hosts/{h.name}">
+			<ListRow stackMeta href="/hosts/{h.name}">
 				{#snippet leading()}<IconTile icon={look.icon} tone={look.tone} />{/snippet}
 				{#snippet titleContent()}{h.name}{/snippet}
 				{#snippet subtitleContent()}
@@ -183,7 +183,7 @@
 			<Input
 				id="h-name"
 				bind:value={name}
-				placeholder="nas"
+				placeholder="e.g. nas"
 				autocapitalize="off"
 				autocomplete="off"
 				required
@@ -197,7 +197,7 @@
 			<Input
 				id="h-addr"
 				bind:value={address}
-				placeholder="192.168.1.20"
+				placeholder="e.g. 192.168.1.20"
 				inputmode="decimal"
 				autocomplete="off"
 				required
@@ -215,7 +215,10 @@
 				]}
 			/>
 		</div>
-		<ul class="divide-y divide-separator overflow-hidden rounded-xl bg-card">
+		<ul
+			aria-label="Host flags"
+			class="divide-y divide-separator overflow-hidden rounded-xl bg-card"
+		>
 			<SettingsRow
 				title="Hypervisor"
 				description="A Proxmox host: sudo controls every guest."

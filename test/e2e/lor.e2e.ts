@@ -304,3 +304,89 @@ test('confirmation actions stay in view in short desktop and phone windows', asy
 	}
 	await page.setViewportSize({ width: 1280, height: 800 });
 });
+
+test('audit validates grant numbers instead of silently showing all events', async () => {
+	await page.goto('/audit');
+	const filter = page.getByRole('searchbox', { name: 'Grant number' });
+	await filter.fill('#7');
+	await expect(page).toHaveURL(/grant_id=7/);
+	await filter.fill('not-a-number');
+	await expect(page.getByText('Enter a positive grant number, such as 7 or #7.')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Enter a valid grant number' })).toBeVisible();
+	await expect(filter).toHaveAttribute('aria-invalid', 'true');
+	await page.screenshot({ path: join(shots, 'audit-invalid-filter-desktop.png') });
+	await page.getByRole('button', { name: 'Clear grant filter', exact: true }).click();
+	await expect(page.getByTestId('audit-log')).toBeVisible();
+});
+
+test('older audit responses are discarded when their filter changes', async () => {
+	const seed = await (await page.request.get('/api/admin/v1/audit')).json();
+	const template = seed.events[0];
+	const initial = Array.from({ length: 100 }, (_, index) => ({ ...template, id: 1000 - index, action: 'grant.requested' }));
+	let releaseOlder!: () => void;
+	let startedOlder!: () => void;
+	const olderReady = new Promise<void>((resolve) => { startedOlder = resolve; });
+	const olderRelease = new Promise<void>((resolve) => { releaseOlder = resolve; });
+	await page.route('**/api/admin/v1/audit*', async (route) => {
+		const params = new URL(route.request().url()).searchParams;
+		if (params.has('before')) {
+			startedOlder();
+			await olderRelease;
+			await route.fulfill({ json: { events: [{ ...template, id: 800, action: 'agent.disabled' }] } });
+		} else if (params.get('action') === 'host.') {
+			await route.fulfill({ json: { events: [{ ...template, id: 1100, action: 'host.created' }] } });
+		} else {
+			await route.fulfill({ json: { events: initial } });
+		}
+	});
+	await page.goto('/audit');
+	await page.getByRole('button', { name: 'Load older events', exact: true }).click();
+	await olderReady;
+	await page.getByRole('radio', { name: 'Hosts', exact: true }).click();
+	await expect(page.locator('[data-action="host.created"]')).toHaveCount(1);
+	const response = page.waitForResponse((r) => new URL(r.url()).searchParams.has('before'));
+	releaseOlder();
+	await (await response).finished();
+	await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+	await expect(page.locator('[data-action="agent.disabled"]')).toHaveCount(0);
+	await expect(page.locator('[data-action="host.created"]')).toHaveCount(1);
+	await page.unroute('**/api/admin/v1/audit*');
+});
+
+test('audit does not show empty or completion claims while filters update', async () => {
+	const seed = await (await page.request.get('/api/admin/v1/audit')).json();
+	const template = seed.events[0];
+	let releaseAll!: () => void;
+	let releaseHosts!: () => void;
+	const all = new Promise<void>((resolve) => { releaseAll = resolve; });
+	const hosts = new Promise<void>((resolve) => { releaseHosts = resolve; });
+	await page.route('**/api/admin/v1/audit*', async (route) => {
+		const params = new URL(route.request().url()).searchParams;
+		if (params.has('grant_id')) {
+			await route.fulfill({ json: { events: [] } });
+		} else if (params.get('action') === 'host.') {
+			await hosts;
+			await route.fulfill({ json: { events: [{ ...template, id: 1200, action: 'host.created' }] } });
+		} else {
+			await all;
+			await route.fulfill({ json: { events: [{ ...template, id: 1199, action: 'grant.requested' }] } });
+		}
+	});
+	await page.goto('/audit?grant_id=99999');
+	await expect(page.getByRole('heading', { name: 'No matching events' })).toBeVisible();
+	await page.getByRole('searchbox', { name: 'Grant number' }).fill('');
+	await expect(page.getByText(/Updating results/)).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'No matching events' })).toHaveCount(0);
+	await expect(page.getByText("That's everything.")).toHaveCount(0);
+	await page.screenshot({ path: join(shots, 'audit-updating-from-empty-desktop.png') });
+	releaseAll();
+	await expect(page.locator('[data-action="grant.requested"]')).toHaveCount(1);
+	await page.getByRole('radio', { name: 'Hosts', exact: true }).click();
+	await expect(page.getByText(/Updating results/)).toBeVisible();
+	await expect(page.getByText("That's everything.")).toHaveCount(0);
+	await page.screenshot({ path: join(shots, 'audit-updating-retained-desktop.png') });
+	releaseHosts();
+	await expect(page.locator('[data-action="host.created"]')).toHaveCount(1);
+	await expect(page.getByText(/Updating results/)).toHaveCount(0);
+	await page.unroute('**/api/admin/v1/audit*');
+});

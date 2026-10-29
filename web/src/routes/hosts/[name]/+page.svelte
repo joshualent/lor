@@ -236,7 +236,10 @@
 							/>
 						</div>
 					</Card>
-					<ul class="divide-y divide-separator overflow-hidden rounded-xl bg-card">
+					<ul
+						aria-label="Host flags"
+						class="divide-y divide-separator overflow-hidden rounded-xl bg-card"
+					>
 						<SettingsRow
 							title="Hypervisor"
 							description="A Proxmox host: sudo controls every guest."

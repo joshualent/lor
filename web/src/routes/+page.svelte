@@ -109,7 +109,9 @@
 				extendFor = g;
 				extendOpen = true;
 			}}
-			aria-label="Extend {g.host.name}">Extend</Button
+			aria-label="Extend {g.host.name} for {g.agent.name}, {g.level === 'sudo'
+				? 'sudo'
+				: 'standard user'}, grant #{g.id}">Extend</Button
 		>
 		<Button
 			size="sm"
@@ -119,7 +121,8 @@
 				revokeFor = g;
 				revokeOpen = true;
 			}}
-			aria-label="{g.status === 'offered' ? 'Withdraw offer for' : 'Revoke'} {g.host.name}"
+			aria-label="{g.status === 'offered' ? 'Withdraw offer for' : 'Revoke'} {g.host.name} for {g
+				.agent.name}, {g.level === 'sudo' ? 'sudo' : 'standard user'}, grant #{g.id}"
 			>{g.status === 'offered' ? 'Withdraw' : 'Revoke'}</Button
 		>
 	</div>
@@ -164,16 +167,19 @@
 		/>
 	</nav>
 	{#if expiring.length}
-		<a
-			href="/grants/{expiring[0].id}"
-			class="-mt-3 mb-6 flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-1 text-callout text-warning no-underline! focus-ring"
-			><Clock class="size-4" aria-hidden="true" /><span
-				>{expiring[0].host.name} access expires in <Countdown
+		<div
+			class="-mt-3 mb-6 flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 px-1 text-callout text-warning"
+		>
+			<Clock class="size-4" aria-hidden="true" /><span
+				>{expiring[0].agent.name}'s access to {expiring[0].host.name} expires in <Countdown
 					end={expiring[0].valid_before}
 					suffix=""
 				/>{expiring.length > 1 ? ` · ${expiring.length} expiring soon` : ''}</span
-			><span class="ml-auto underline underline-offset-4">Review access</span></a
-		>
+			>
+			<Button variant="link" size="sm" href="/grants/{expiring[0].id}" class="ml-auto"
+				>Review access</Button
+			>
+		</div>
 	{/if}
 	<div class="grid items-start gap-8 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
 		<div class="min-w-0 space-y-8 xl:col-start-1 xl:row-start-1">
@@ -186,7 +192,15 @@
 				>
 					<List data-testid="pending">
 						{#each d.pending_requests as g (g.id)}
-							<ListRow href="/r/{g.id}" density="relaxed">
+							<ListRow
+								href="/r/{g.id}"
+								density="relaxed"
+								label="Review {g.agent.name} request for {g.requested_level === 'sudo'
+									? 'sudo'
+									: 'standard user'} on {g.host.name}, grant #{g.id}{g.approval_deadline
+									? `, ${formatCountdown(Date.parse(g.approval_deadline), clock.now)} to decide`
+									: ''}"
+							>
 								{#snippet leading()}<IconTile icon={Inbox} tone="warning" />{/snippet}
 								{#snippet titleContent()}
 									<span class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
@@ -217,7 +231,14 @@
 							</ListRow>
 						{/each}
 						{#each d.pending_extensions as x (x.extension.id)}
-							<ListRow href="/e/{x.extension.id}" density="relaxed">
+							<ListRow
+								href="/e/{x.extension.id}"
+								density="relaxed"
+								label="Review {x.grant.agent.name} extension request on {x.grant.host
+									.name}, grant #{x.grant.id}, add {formatDuration(
+									x.extension.requested_duration_s
+								)}"
+							>
 								{#snippet leading()}<IconTile icon={TimerReset} tone="warning" />{/snippet}
 								{#snippet titleContent()}
 									{x.grant.agent.name}
@@ -256,9 +277,12 @@
 				<ListRow
 					stackMeta
 					href="/grants/{g.id}"
-					label="{g.host.name}, {g.agent.name}{g.level === 'sudo' ? ', sudo' : ''}{g.status ===
-					'offered'
-						? ', offer not claimed yet'
+					label="{g.host.name}, {g.agent.name}, {g.level === 'sudo'
+						? 'sudo'
+						: 'standard user'}, grant #{g.id}{g.status === 'offered'
+						? ', offer not claimed'
+						: ', active'}{g.valid_before
+						? `, ${formatCountdown(Date.parse(g.valid_before), clock.now)} remaining`
 						: ''}"
 				>
 					{#snippet leading()}<IconTile icon={look.icon} tone={look.tone} />{/snippet}
@@ -301,7 +325,7 @@
 			<Section
 				id="active"
 				title="Active"
-				count={d.active.length || undefined}
+				count={d.active.length}
 				description={hasCommands
 					? 'Last commands are reported by the agents and unverified.'
 					: undefined}
@@ -334,17 +358,15 @@
 			{:else}
 				<Section id="offers" title="Offers" count={0}
 					><p class="text-callout text-muted-foreground">
-						No open offers. <a href="/grants/new" class="text-primary">Grant access</a> before an agent
-						asks.
+						No open offers. <Button variant="link" size="sm" href="/grants/new">Grant access</Button
+						> before an agent asks.
 					</p></Section
 				>
 			{/if}
 		</div>
 		<Section class="xl:col-start-1 xl:row-start-2" title="Recent activity">
 			{#snippet action()}
-				<Button variant="ghost" size="sm" href="/audit" class="text-muted-foreground"
-					>View all</Button
-				>
+				<Button variant="link" size="sm" href="/audit">View all</Button>
 			{/snippet}
 			{#if d.recent_audit.length === 0}
 				<EmptyState
@@ -366,6 +388,8 @@
 			bind:open={extendOpen}
 			grantId={extendFor.id}
 			host={extendFor.host.name}
+			agent={extendFor.agent.name}
+			level={extendFor.level}
 			end={extendFor.valid_before}
 			onDone={refresh}
 		/>
@@ -377,6 +401,10 @@
 			: `Revoke access to ${revokeFor?.host.name}?`}
 		description={revokeFor?.status === 'offered' ? WITHDRAW_NOTE : REVOKE_NOTE}
 	>
+		{#if revokeFor}<p class="text-callout">
+				{revokeFor.agent.name} · {revokeFor.level === 'sudo' ? 'sudo (root)' : 'standard user'} · Grant
+				#{revokeFor.id}
+			</p>{/if}
 		{#snippet footer()}
 			<Button variant="outline" onclick={() => (revokeOpen = false)}>Cancel</Button>
 			<Button variant="destructive" disabled={revoking} onclick={revoke}

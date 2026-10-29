@@ -390,6 +390,9 @@
 				>nas <span class="font-mono text-callout text-muted-foreground">192.168.1.20</span
 				></DescriptionItem
 			>
+			<DescriptionItem label="Public URL" layout="responsive" mono
+				>https://lor.example.com</DescriptionItem
+			>
 			<DescriptionItem label="Connect from" mono>192.168.1.50</DescriptionItem>
 			<DescriptionItem label="Key" layout="stacked" mono
 				>SHA256:9Qk2m4b8m2J7yN1fS0rP3cV6xZ5wT8uH4gL2aE1dKc</DescriptionItem

@@ -170,8 +170,9 @@
 									datetime={p.created_at}
 									title={formatTimestamp(Date.parse(p.created_at))}
 									>Added {formatAgo(Date.parse(p.created_at), clock.now)}</time
-								>{#if p.last_used_at}
-									· used {formatAgo(Date.parse(p.last_used_at), clock.now)}{/if}{/snippet}
+								>{p.last_used_at
+									? ` · used ${formatAgo(Date.parse(p.last_used_at), clock.now)}`
+									: ''}{/snippet}
 							{#snippet leading()}<IconTile icon={KeyRound} tone="info" />{/snippet}
 							{#snippet titleContent()}
 								<span class="flex flex-wrap items-center gap-2">
@@ -227,7 +228,7 @@
 						{@const device = describeUserAgent(s.user_agent)}
 						<ListRow
 							subtitle={[
-								s.passkey_name,
+								`Passkey: ${s.passkey_name}`,
 								`active ${formatAgo(Date.parse(s.last_seen_at), clock.now)}`,
 								s.forwarded_for
 							]
@@ -271,7 +272,9 @@
 	{#if config}
 		<Section title="About this Lor" footnote="Set in lor-server.toml on the Lor LXC.">
 			<DescriptionList>
-				<DescriptionItem label="Public URL" mono>{config.public_url}</DescriptionItem>
+				<DescriptionItem label="Public URL" layout="responsive" mono
+					>{config.public_url}</DescriptionItem
+				>
 				<DescriptionItem label="Default grant"
 					>{formatDuration(config.default_grant_duration_s)}</DescriptionItem
 				>

@@ -47,6 +47,8 @@
 </script>
 
 <ListRow
+	stackMeta
+	reserveChevron
 	onclick={expandable ? () => (open = !open) : undefined}
 	expanded={expandable ? open : undefined}
 	controls={expandable ? regionId : undefined}

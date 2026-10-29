@@ -241,7 +241,7 @@
 						</p>
 						{#if sudo}
 							<label
-								class="flex cursor-pointer items-start gap-3 rounded-lg border border-warning-edge bg-warning-tint px-3 py-2.5"
+								class="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-warning-edge bg-warning-tint px-3 py-2.5"
 							>
 								<Checkbox
 									bind:checked={confirmed}

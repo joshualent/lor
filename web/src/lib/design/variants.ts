@@ -63,7 +63,7 @@ export const buttonVariants = tv({
 			ghost: 'hover:bg-secondary aria-expanded:bg-secondary',
 			destructive:
 				'bg-destructive-tint text-destructive hover:bg-destructive-edge/70 focus-visible:ring-destructive/30',
-			link: 'text-primary underline-offset-4 hover:underline px-0'
+			link: 'text-primary underline-offset-4 hover:underline focus-visible:underline'
 		},
 		size: {
 			default: 'h-10 gap-2 px-4',
@@ -73,6 +73,7 @@ export const buttonVariants = tv({
 			'icon-sm': "size-8 after:absolute after:-inset-1.5 after:content-['']"
 		}
 	},
+	compoundVariants: [{ variant: 'link', class: 'px-0' }],
 	defaultVariants: { variant: 'default', size: 'default' }
 });
 export type ButtonVariant = VariantProps<typeof buttonVariants>['variant'];
@@ -236,7 +237,7 @@ export const listRowVariants = tv({
 export const segmentedVariants = tv({
 	slots: {
 		root: 'inline-flex max-w-full items-stretch gap-0.5 rounded-lg bg-card p-0.5',
-		item: "focus-ring relative inline-flex min-h-9 min-w-0 sm:min-h-8 after:absolute after:-inset-y-1 after:inset-x-0 after:content-[''] flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-footnote font-medium whitespace-nowrap text-muted-foreground transition-colors duration-(--duration-fast) hover:text-foreground aria-checked:bg-secondary aria-checked:text-foreground [&_svg]:size-3.5"
+		item: "focus-ring relative inline-flex min-h-9 min-w-0 sm:min-h-8 after:absolute after:-inset-y-1 after:inset-x-0 after:content-[''] flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-footnote font-medium whitespace-nowrap text-muted-foreground transition-colors duration-(--duration-fast) hover:text-foreground aria-checked:bg-secondary aria-checked:text-foreground before:absolute before:bottom-1 before:inset-x-3 before:h-0.5 before:rounded-full before:bg-primary before:opacity-0 aria-checked:before:opacity-100 [&_svg]:size-3.5"
 	},
 	variants: {
 		fill: { true: { root: 'flex w-full' }, false: {} }

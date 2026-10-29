@@ -20,7 +20,7 @@
 	} = $props();
 </script>
 
-<div class="mb-3 flex min-h-8 items-end justify-between gap-3 px-1" data-slot="section-header">
+<div class="mb-3 flex min-h-8 items-center justify-between gap-3 px-1" data-slot="section-header">
 	<div class="min-w-0">
 		<h2 {id} class="flex items-center gap-2 text-heading text-foreground">
 			{title}

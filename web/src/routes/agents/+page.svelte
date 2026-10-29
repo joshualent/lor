@@ -268,7 +268,7 @@
 					>{formatTimestamp(Date.parse(selected.created_at))}</DescriptionItem
 				>
 			</DescriptionList>
-			<List class="bg-background/60">
+			<List label="Agent actions" class="bg-background/60">
 				<ListRow
 					onclick={() =>
 						fromSheet(() => {
@@ -334,7 +334,7 @@
 			<Input
 				id="a-name"
 				bind:value={name}
-				placeholder="claude"
+				placeholder="e.g. claude"
 				autocapitalize="off"
 				autocomplete="off"
 				required
@@ -348,7 +348,7 @@
 			<Input
 				id="a-ip"
 				bind:value={ip}
-				placeholder="192.168.1.50"
+				placeholder="e.g. 192.168.1.50"
 				inputmode="decimal"
 				autocomplete="off"
 				required

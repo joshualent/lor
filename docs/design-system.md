@@ -137,7 +137,7 @@ The merge helpers (`cn()` and tailwind-variants) are configured
 | `Section` / `SectionHeader` | a page region: title, count, description, action, footnote |
 | `Card` | outlined surface for free-form content (forms, summaries) |
 | `SummaryCard` | linked count, label and explanation; semantic color on nonzero counts, neutral zero state |
-| `ActionBar` | the page's decision buttons in one row (secondary first, primary `flex-1`, label may wrap); sticky at the bottom on phones |
+| `ActionBar` | the page's decision buttons in one row (secondary first, primary `flex-1`, label may wrap); sticky at the bottom when space allows; in the flow below 360 px width or 700 px height |
 | `AuthCard` | signed-out screens (login, setup) |
 
 ### Lists and details
@@ -273,3 +273,12 @@ Don't:
 - Consent repeats the selected level and duration near its header, alongside the requested duration when it differs, and offers a direct jump to the controls. Full server warnings and the agent's reason remain visible as plain text.
 - Audit uses a native category picker on phones and wrapping chips on larger screens. Grant-number entry is debounced; a new filter keeps previous results with an explicit updating notice until matching data arrives.
 - Disabling an agent requires confirmation naming its consequences. A failed disable or sign-out keeps the current view available for retry. Backend authentication and authorization requirements are unchanged.
+
+- Grant actions and confirmations identify host, agent, level and grant ID;
+  accessible active-link names also retain expiry. Pending-link names stay
+  concise while the full unverified reason remains on the consent page.
+- Audit discards late pagination responses from an earlier filter. Invalid
+  grant numbers show an inline error; # prefixes are accepted. Viewing
+  older history pauses automatic refresh, with a Back to latest action.
+- Narrow audit and host rows stack metadata; long description values can
+  use the responsive layout. Selected segments include an accent marker.

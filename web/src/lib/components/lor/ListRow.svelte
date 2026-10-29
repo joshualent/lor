@@ -16,6 +16,7 @@
 		subtitle,
 		meta,
 		chevron,
+		reserveChevron = false,
 		density = 'default',
 		stackMeta = false,
 		tone = 'default',
@@ -40,6 +41,8 @@
 		meta?: string;
 		/** Defaults to true for links. */
 		chevron?: boolean;
+		/** Keep static rows aligned with disclosure rows. */
+		reserveChevron?: boolean;
 		density?: 'default' | 'compact' | 'relaxed';
 		/** Put metadata below the text on phones, for long addresses or summaries. */
 		stackMeta?: boolean;
@@ -94,7 +97,10 @@
 			aria-hidden="true"
 			data-slot="disclosure"
 		/>
-	{:else if showChevron}<ChevronRight class={s.chevron()} aria-hidden="true" />{/if}
+	{:else if showChevron}<ChevronRight
+			class={s.chevron()}
+			aria-hidden="true"
+		/>{:else if reserveChevron}<span class={s.chevron()} aria-hidden="true"></span>{/if}
 {/snippet}
 
 <li class={cn(s.root(), expanded && 'bg-card-hover/60', className)} data-slot="list-row" {...rest}>

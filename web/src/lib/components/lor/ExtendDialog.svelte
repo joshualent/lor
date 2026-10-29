@@ -16,9 +16,19 @@
 		open = $bindable(false),
 		grantId,
 		host,
+		agent,
+		level,
 		end,
 		onDone
-	}: { open: boolean; grantId: number; host: string; end: string; onDone: () => void } = $props();
+	}: {
+		open: boolean;
+		grantId: number;
+		host: string;
+		agent: string;
+		level: 'user' | 'sudo';
+		end: string;
+		onDone: () => void;
+	} = $props();
 
 	let seconds = $state(3600);
 	let valid = $state(true);
@@ -50,6 +60,9 @@
 	description="Added time counts from the current end."
 >
 	<div class="space-y-4">
+		<p class="text-callout">
+			{agent} · {level === 'sudo' ? 'sudo (root)' : 'standard user'} · Grant #{grantId}
+		</p>
 		<DurationPicker
 			bind:value={seconds}
 			bind:valid

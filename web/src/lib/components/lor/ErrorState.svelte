@@ -33,7 +33,7 @@
 <EmptyState
 	icon={notFound ? SearchX : CloudOff}
 	tone={notFound ? 'neutral' : 'danger'}
-	title={title ?? (notFound ? 'Not found' : "Couldn't load this")}
+	title={title ?? (notFound ? 'This link is unavailable' : "Couldn't load this")}
 	description={errorMessage(error)}
 	{variant}
 	role="alert"

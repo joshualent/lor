@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { parseGrantFilter } from '#lib/grant-filter.js';
 	import ScrollText from '@lucide/svelte/icons/scroll-text';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -42,21 +43,28 @@
 	let loadingMore = $state(false);
 	let moreError = $state<unknown>(null);
 
+	const grantFilter = $derived(parseGrantFilter(grantQuery));
+	let filterRevision = 0;
 	const filter = $derived({
 		actor: actor || undefined,
 		action: action.trim() || undefined,
-		grant_id: Number(grantQuery) || undefined
+		grant_id: grantFilter.value
 	});
 	const q = createQuery(() => ({
 		queryKey: keys.audit(filter),
 		queryFn: () => fetchAudit(filter),
-		refetchInterval: 15_000,
-		placeholderData: keepPreviousData
+		refetchInterval: loadingMore || older.length > 0 ? false : 15_000,
+		refetchOnWindowFocus: !loadingMore && older.length === 0,
+		placeholderData: keepPreviousData,
+		enabled: !grantFilter.error
 	}));
 	$effect(() => {
 		void filter;
+		filterRevision++;
 		older = [];
 		olderDone = false;
+		loadingMore = false;
+		moreError = null;
 	});
 
 	// Keep the filters in the URL, so a filtered log can be shared or reloaded.
@@ -79,7 +87,7 @@
 			!olderDone &&
 			(older.length ? older.length % PAGE === 0 : (q.data?.length ?? 0) >= PAGE)
 	);
-	const filtered = $derived(!!(filter.actor || filter.action || filter.grant_id));
+	const filtered = $derived(!!(filter.actor || filter.action || grant.trim()));
 
 	// The category chips, plus the current prefix if it came from a link.
 	const categories = $derived(
@@ -90,17 +98,24 @@
 
 	async function more() {
 		const last = events.at(-1);
-		if (!last) return;
+		if (!last || loadingMore || q.isFetching || q.isPlaceholderData || grantFilter.error) return;
+		const revision = filterRevision;
+		const initiatingFilter = { ...filter };
 		loadingMore = true;
 		moreError = null;
 		try {
-			const next = await fetchAudit({ ...filter, before: last.id });
+			const next = await fetchAudit({ ...initiatingFilter, before: last.id });
+			if (
+				revision !== filterRevision ||
+				JSON.stringify(initiatingFilter) !== JSON.stringify(filter)
+			)
+				return;
 			if (next.length < PAGE) olderDone = true;
 			older = [...older, ...next];
 		} catch (e) {
-			moreError = e;
+			if (revision === filterRevision) moreError = e;
 		} finally {
-			loadingMore = false;
+			if (revision === filterRevision) loadingMore = false;
 		}
 	}
 
@@ -122,38 +137,58 @@
 </PageHeader>
 
 <Toolbar label="Filters">
-	<SegmentedControl
-		label="Who"
-		bind:value={actor}
-		options={ACTOR_FILTERS.map((f) => ({ value: f.value, label: f.label }))}
-		class="w-full sm:w-auto"
-		fill
-	/>
-	<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-		<div class="sm:hidden">
-			<label for="audit-category" class="mb-1 block text-footnote text-muted-foreground"
+	<div class="space-y-2">
+		<p class="text-footnote text-muted-foreground">Who</p>
+		<SegmentedControl
+			label="Who"
+			bind:value={actor}
+			options={ACTOR_FILTERS.map((f) => ({ value: f.value, label: f.label }))}
+			class="w-full sm:w-auto"
+			fill
+		/>
+	</div>
+	<div
+		class="grid grid-cols-[minmax(0,1fr)_7.5rem] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]"
+	>
+		<div class="min-w-0 space-y-2">
+			<label for="audit-category" class="block text-footnote text-muted-foreground sm:hidden"
 				>Category</label
-			><NativeSelect id="audit-category" bind:value={action}
+			>
+			<p class="hidden text-footnote text-muted-foreground sm:block">Category</p>
+			<NativeSelect id="audit-category" bind:value={action} class="sm:hidden"
 				>{#each categories as c (c.prefix)}<option value={c.prefix}
 						>{c.prefix ? c.label : 'All categories'}</option
 					>{/each}</NativeSelect
 			>
+			<ChipGroup
+				label="Category"
+				bind:value={action}
+				options={categories.map((c) => ({ value: c.prefix, label: c.label }))}
+				class="hidden sm:flex"
+			/>
 		</div>
-		<ChipGroup
-			label="Category"
-			bind:value={action}
-			options={categories.map((c) => ({ value: c.prefix, label: c.label }))}
-			class="hidden sm:flex sm:flex-1"
-		/>
-		<SearchField
-			bind:value={grant}
-			label="Grant number"
-			placeholder="Grant #"
-			inputmode="numeric"
-			class="sm:w-36"
-		/>
+		<div class="space-y-2">
+			<label for="audit-grant-number" class="block text-footnote text-muted-foreground"
+				>Grant number</label
+			><SearchField
+				bind:value={grant}
+				id="audit-grant-number"
+				aria-invalid={!!grantFilter.error}
+				aria-describedby={grantFilter.error ? 'audit-grant-error' : undefined}
+				label="Grant number"
+				placeholder="Grant #"
+				inputmode="numeric"
+			/>
+		</div>
 	</div>
 </Toolbar>
+{#if grantFilter.error}<p
+		id="audit-grant-error"
+		role="alert"
+		class="-mt-2 mb-5 text-footnote text-destructive"
+	>
+		{grantFilter.error}
+	</p>{/if}
 
 {#if q.isError && q.data}<StaleNotice
 		error={q.error}
@@ -162,7 +197,27 @@
 		onretry={() => q.refetch()}
 	/>{/if}
 
-{#if q.isPending}
+{#if q.isPlaceholderData && !grantFilter.error}<p
+		role="status"
+		class="mb-4 flex items-center gap-2 text-footnote text-muted-foreground"
+	>
+		<Spinner class="size-3.5" /> Updating results… {events.length
+			? 'Previous results are shown below.'
+			: 'Loading matching events.'}
+	</p>{/if}
+{#if grantFilter.error}
+	<EmptyState
+		title="Enter a valid grant number"
+		description="Use the number on the grant, with or without #."
+		>{#snippet action()}<Button
+				variant="secondary"
+				onclick={() => {
+					grant = '';
+					grantQuery = '';
+				}}>Clear grant filter</Button
+			>{/snippet}</EmptyState
+	>
+{:else if q.isPending || (q.isPlaceholderData && events.length === 0)}
 	<ListSkeleton rows={8} />
 {:else if q.isError && !q.data}
 	<ErrorState error={q.error} fetching={q.isFetching} onretry={() => q.refetch()} variant="inset" />
@@ -179,12 +234,6 @@
 		{/snippet}
 	</EmptyState>
 {:else}
-	{#if q.isPlaceholderData}<p
-			role="status"
-			class="mb-4 flex items-center gap-2 text-footnote text-muted-foreground"
-		>
-			<Spinner class="size-3.5" /> Updating results… Previous results are shown below.
-		</p>{/if}
 	<div class="space-y-6" data-testid="audit-log" aria-busy={q.isPlaceholderData}>
 		{#each groups as group (group.key)}
 			<Section title={group.label} count={group.events.length}>
@@ -195,16 +244,35 @@
 				</List>
 			</Section>
 		{/each}
+		{#if older.length > 0}<div
+				class="flex flex-wrap items-center justify-center gap-x-3 text-footnote text-muted-foreground"
+			>
+				<span>Live updates paused while viewing older events.</span><Button
+					variant="link"
+					size="sm"
+					onclick={() => {
+						older = [];
+						olderDone = false;
+						moreError = null;
+						q.refetch();
+					}}>Back to latest</Button
+				>
+			</div>{/if}
 		{#if moreError}
 			<p class="text-center text-footnote text-destructive" role="alert">
 				Couldn't load older events: {errorMessage(moreError)}
 			</p>
 		{/if}
 		{#if hasMore}
-			<Button variant="secondary" class="w-full" disabled={loadingMore} onclick={more}>
+			<Button
+				variant="secondary"
+				class="w-full"
+				disabled={loadingMore || q.isFetching}
+				onclick={more}
+			>
 				{#if loadingMore}<Spinner />{/if}{moreError ? 'Try again' : 'Load older events'}
 			</Button>
-		{:else}
+		{:else if !q.isPlaceholderData}
 			<p class="text-center text-footnote text-muted-foreground">That's everything.</p>
 		{/if}
 	</div>

@@ -149,7 +149,7 @@
 
 	const levelText = (l: string) => (l === 'sudo' ? 'sudo' : 'standard user');
 	const isRequest = $derived(g?.origin === 'agent_request');
-	const kindLabel = $derived(isRequest ? 'Request' : 'Offer');
+	const kindLabel = 'Grant';
 	const levelSummary = $derived(
 		g
 			? levelText(g.level) +
@@ -205,21 +205,22 @@
 						>Request #{g.id} · {formatAgo(Date.parse(g.requested_at), clock.now)}</span
 					>
 					<div
-						class="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-separator pt-2 text-callout"
+						class="flex w-full items-center justify-between gap-3 border-t border-separator pt-2 text-callout"
 					>
-						<span
-							>Selected: <strong>{level === 'sudo' ? 'sudo (root)' : 'standard user'}</strong> · {durationValid
-								? formatDuration(duration)
-								: 'Choose a duration'}{#if durationValid && duration !== g.requested_duration_s}<span
+						<div class="min-w-0">
+							<p>
+								Selected: <strong>{level === 'sudo' ? 'sudo' : 'standard user'}</strong> · {durationValid
+									? formatDuration(duration)
+									: 'Choose a duration'}
+							</p>
+							{#if durationValid && duration !== g.requested_duration_s}<p
 									class="text-footnote text-muted-foreground"
 								>
-									· requested {formatDuration(g.requested_duration_s ?? 0)}</span
-								>{/if}</span
-						>
-						<a
-							href="#access-choices"
-							class="inline-flex min-h-10 items-center rounded-md text-primary focus-ring"
-							>Change access</a
+									Requested {formatDuration(g.requested_duration_s ?? 0)}
+								</p>{/if}
+						</div>
+						<Button variant="link" size="sm" href="#access-choices" class="min-h-11 shrink-0"
+							>Change access</Button
 						>
 					</div>
 				{/snippet}
@@ -306,7 +307,7 @@
 				{#snippet note()}
 					{#if sudo}
 						<label
-							class="flex cursor-pointer items-center gap-3 rounded-lg border border-warning-edge bg-warning-tint px-3 py-2"
+							class="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-warning-edge bg-warning-tint px-3 py-2"
 						>
 							<Checkbox
 								bind:checked={confirmed}
@@ -532,6 +533,9 @@
 		title={g.status === 'offered' ? 'Withdraw this offer?' : `Revoke access to ${g.host.name}?`}
 		description={g.status === 'offered' ? WITHDRAW_NOTE : REVOKE_NOTE}
 	>
+		<p class="text-callout">
+			{g.agent.name} · {g.level === 'sudo' ? 'sudo (root)' : 'standard user'} · Grant #{g.id}
+		</p>
 		<div class="space-y-2">
 			<Label for="revoke-note">Note (optional)</Label>
 			<Textarea id="revoke-note" bind:value={note} maxlength={1000} rows={2} />
@@ -549,6 +553,8 @@
 			bind:open={extendOpen}
 			grantId={g.id}
 			host={g.host.name}
+			agent={g.agent.name}
+			level={g.level}
 			end={g.valid_before}
 			onDone={refresh}
 		/>
