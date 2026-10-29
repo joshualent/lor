@@ -409,6 +409,9 @@ test('audit does not show empty or completion claims while filters update', asyn
 	releaseHosts();
 	await expect(page.locator('[data-action="host.created"]')).toHaveCount(1);
 	await expect(page.getByText(/Updating results/)).toHaveCount(0);
+	await expect(page.getByRole('navigation', { name: 'Audit pages', exact: true }).getByRole('button')).toHaveCount(0);
+	await expect(page.getByRole('navigation', { name: 'Audit pages', exact: true })).toContainText('Event 1');
+	await page.screenshot({ path: join(shots, 'audit-single-result-desktop.png') });
 	await page.unroute('**/api/admin/v1/audit*');
 });
 
@@ -548,6 +551,73 @@ test('phone audit pages stay bounded, navigate cached history and retry without 
 			await expect(top.getByText('Live updates paused', { exact: true })).toHaveCount(0);
 			await expect.poll(() => reads).toBe(2);
 			expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+		} finally {
+			await page.unroute('**/api/admin/v1/audit*');
+		}
+	}
+	await page.setViewportSize({ width: 1280, height: 800 });
+});
+
+
+test('audit history survives reconnects and empty boundaries preserve focus', async () => {
+	const seed = await (await page.request.get('/api/admin/v1/audit')).json();
+	const template = { ...seed.events[0], grant_id: 42 };
+	const events = (first: number, action: string) => Array.from({ length: 100 }, (_, i) => ({ ...template, id: first - i, action }));
+	const visibleIds = () => page.locator('[data-action] [aria-controls^="audit-"]').evaluateAll(els => els.map(el => Number(el.getAttribute('aria-controls')!.slice(6))));
+	for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+		let reads = 0;
+		let advanced = false;
+		const cursors: string[] = [];
+		await page.route('**/api/admin/v1/audit*', async (route) => {
+			const cursor = new URL(route.request().url()).searchParams.get('before');
+			if (cursor) {
+				cursors.push(cursor);
+				await route.fulfill({ json: { events: cursor === '801' ? [] : events(Number(cursor) - 1, 'agent.created') } });
+			} else {
+				reads++;
+				await route.fulfill({ json: { events: events(advanced ? 1001 : 1000, 'grant.requested') } });
+			}
+		});
+		try {
+			await page.setViewportSize(viewport);
+			await page.goto('/audit');
+			const top = page.getByRole('navigation', { name: 'Audit pages', exact: true });
+			const footer = page.getByRole('navigation', { name: 'Audit pages footer', exact: true });
+			await olderAuditPages(4); // Load a second server buffer: 1000..901, 900..801.
+			await expect(page.locator('[data-action="agent.created"]')).toHaveCount(25);
+			await top.getByRole('button', { name: 'Newer events', exact: true }).click();
+			await expect(top.getByText('Events 76–100')).toBeVisible();
+			expect(await visibleIds()).toEqual(Array.from({ length: 25 }, (_, i) => 925 - i));
+			advanced = true; // A new latest event exists, but history must remain unchanged.
+			const hostsRefreshed = page.waitForResponse(r => new URL(r.url()).pathname === '/api/admin/v1/hosts');
+			await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+			await page.evaluate(() => window.dispatchEvent(new Event('online')));
+			await (await hostsRefreshed).finished(); // Another query proves reconnect handling actually ran.
+			await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+			expect(reads).toBe(1);
+			expect(await visibleIds()).toEqual(Array.from({ length: 25 }, (_, i) => 925 - i));
+			await expect(top.getByText('Live updates paused', { exact: true })).toBeVisible();
+			await page.screenshot({ path: join(shots, `audit-reconnect-frozen-${viewport.width}.png`) });
+			await olderAuditPages(1);
+			expect(await visibleIds()).toEqual(Array.from({ length: 25 }, (_, i) => 900 - i)); // No 901/900 gap.
+			await olderAuditPages(3);
+			await expect(top.getByText('Events 176–200')).toBeVisible();
+			await footer.getByRole('button', { name: 'Older events', exact: true }).focus();
+			await page.keyboard.press('Enter'); // Exactly 200 events: the next response is empty.
+			await expect(top.getByRole('button', { name: 'Older events', exact: true })).toBeDisabled();
+			await expect(top).toBeFocused();
+			await expect(top.locator('[aria-live="polite"]')).toContainText('End of recorded history.');
+			await expect(top.getByText('Events 176–200')).toBeVisible();
+			expect(await visibleIds()).toEqual(Array.from({ length: 25 }, (_, i) => 825 - i));
+			expect(cursors).toEqual(['901', '801']);
+			await page.screenshot({ path: join(shots, `audit-empty-boundary-${viewport.width}.png`) });
+			await footer.getByRole('button', { name: 'Back to latest', exact: true }).click();
+			await expect(top.getByText('Live updates paused', { exact: true })).toHaveCount(0);
+			await expect.poll(() => reads).toBe(2);
+			await expect.poll(visibleIds).toEqual(Array.from({ length: 25 }, (_, i) => 1001 - i));
+			await olderAuditPages(4);
+			await expect.poll(visibleIds).toEqual(Array.from({ length: 25 }, (_, i) => 901 - i));
+			expect(cursors).toEqual(['901', '801', '902']); // Fresh pagination starts at the refreshed head.
 		} finally {
 			await page.unroute('**/api/admin/v1/audit*');
 		}

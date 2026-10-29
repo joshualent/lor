@@ -205,17 +205,69 @@ floating return-to-filters shortcut overlapping the pagination action at
 
 Round 5 evidence: `round-5/`, 122 screenshots, including phone pagination
 loading, retry, history, final partial page and frozen first-page states.
-Fresh independent council scoring is pending. Final verification uses a
+Fresh independent council results are recorded below. Final verification uses a
 single rebuilt production bundle. An overlapping build/test run had a
 transient gallery-check failure; no UI changes were needed for the full
 rerun to pass. `make test` and `make build` both regenerate the SPA and
 should run sequentially.
 
 
+## Round 5 scores
+
+| Category | Sol | Terra | Opus 5.5 |
+|---|---:|---:|---:|
+| Usability | 8 | 8 | 8 |
+| Visual Hierarchy | 8.5 | 8 | 8 |
+| Consistency | 9 | 8 | 8 |
+| Responsiveness | 8.5 | 8 | 8 |
+| Clarity | 8 | 8 | 8 |
+| Efficiency | 7.5 | 8 | 8 |
+| Learnability | 8 | 8 | 8 |
+| Layout & Composition | 8.5 | 8 | 8 |
+| Typography | 8.5 | 8 | 8 |
+| Color theory & contrast | 8.5 | 8 | 8 |
+| Whitespace | 8.5 | 8 | 8 |
+| Perceived performance | 8 | 8 | 8 |
+| Accessibility | 8 | 8 | 8 |
+
+All three completed independent reviews of a50e192. Sol and Opus independently
+identified reconnect-driven refresh of the supposedly paused audit buffer;
+Sol kept Efficiency below the target. A new round is required after the fix.
+The end-of-history keyboard boundary and smaller copy/consistency findings
+are addressed in the same change.
+
+## Changes for round 6
+
+- Disable reconnect refetch while browsing history and hold a separate copy
+  of the head buffer until an explicit reset. A reconnect regression advances
+  the latest head, proves the online event ran through another query, checks
+  stable event IDs and contiguous page boundaries, and verifies the fresh
+  cursor after Back to latest.
+- Return focus to the top pager even when an older request returns no events;
+  announce the end in its existing live range. Single-page results use a
+  concise range without duplicate disabled controls. Desktop controls group
+  together, and retry instructions are separate from the server error text.
+- Keep grant numbers together in narrow audit rows and use neutral dots for
+  category-only hues. Capture expanded audit details at 320 px.
+- Align request and extension denial identity summaries; keep the reason
+  entry prominent on phones and quiet on desktop. Explain the last-passkey
+  restriction in reachable text and refer recovery to the complete runbook
+  procedure rather than a shortened command.
+
+Round 6 evidence: `round-6/`, 130 screenshots. This adds reconnect and exact
+empty-boundary viewport states, a single-result view, expanded 320 px audit
+details, and one-passkey help. Standard checks pass, all 23 production browser
+tests pass, and all eight screenshot tests pass. The reconnect regression
+first failed against the previous bundle with two head reads instead of one,
+then passed against the corrected bundle. A screenshot assertion was updated
+to normalize the whitespace in the new identity paragraph; the rendered
+identity was correct. Fresh independent council scoring is pending.
+
+
 ## Validation
 
 - `make test`: Go vet/tests, Svelte checks, lint, and 170 Vitest tests pass.
-- `make e2e`: 22 tests pass against the production build, including failed
+- `make e2e`: 23 tests pass against the production build, including failed
   sign-out/revoke-all, agent disable confirmation/failure, inventory filters,
   responsive navigation and overflow at 320–1440 px, and confirmation action
   visibility in short desktop and phone windows. Audit cases also cover

@@ -91,6 +91,11 @@ test('setup, login and empty states', async ({ browser }) => {
 	await shoot('dashboard-empty', '/');
 	await shoot('hosts-empty', '/hosts');
 	await shoot('agents-empty', '/agents');
+	await shoot('settings-one-passkey', '/settings', {
+		prepare: async (p) => {
+			await expect(p.getByText('Keep at least one passkey. Add another before removing this one.')).toBeVisible();
+		}
+	});
 
 	await shootLogin(browser);
 });
@@ -337,7 +342,7 @@ test('screens', async () => {
 		fullPage: false,
 		prepare: async (p) => {
 			await p.getByRole('button', { name: 'Deny', exact: true }).first().click();
-			await expect(p.getByText(new RegExp(`Grant #${ids.media} · Extension #${ids.ext}`))).toBeVisible();
+			await expect(p.getByRole('dialog', { name: 'Deny this extension?' })).toContainText(`Grant #${ids.media} · Extension #${ids.ext}`);
 		}
 	});
 	await shoot('grant-active-sudo', `/grants/${ids.nas}`);
@@ -435,6 +440,15 @@ test('responsive checkpoints', async () => {
 				path: join(out, `${name}-${width}.png`),
 				fullPage: true
 			});
+			if (name === 'audit' && width === 320) {
+				const row = page.locator('[data-action="grant.denied"]').first();
+				await row.getByRole('button').click();
+				await expect(row.getByRole('button')).toHaveAttribute('aria-expanded', 'true');
+				await row.scrollIntoViewIfNeeded();
+				await page.screenshot({ path: join(out, 'audit-expanded-320.png') });
+				expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+			}
+
 		}
 	}
 });

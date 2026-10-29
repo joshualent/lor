@@ -144,11 +144,15 @@
 <div class="grid items-start gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
 	<div class="min-w-0 space-y-8">
 		<Section title="Passkeys" count={passkeys.data?.length}>
-			{#snippet footer()}<p class="text-footnote text-muted-foreground">
-					Lost every passkey? Run <code class="font-mono text-foreground"
-						>lor-server admin reset</code
-					> on the Lor LXC console.
-				</p>{/snippet}
+			{#snippet footer()}<div class="space-y-2 text-footnote text-muted-foreground">
+					{#if onlyOne && passkeys.data?.length === 1}<p id="last-passkey-hint">
+							Keep at least one passkey. Add another before removing this one.
+						</p>{/if}
+					<p>
+						Lost every passkey? On the Lor LXC console, follow “All passkeys lost” in the server
+						runbook.
+					</p>
+				</div>{/snippet}
 			{#snippet action()}
 				<Button size="sm" variant="ghost" onclick={() => (addOpen = true)}
 					><Plus /> Add passkey</Button
@@ -199,7 +203,7 @@
 									variant="ghost"
 									class="text-destructive hover:text-destructive"
 									aria-label="Remove {p.name}"
-									title={onlyOne ? "The last passkey can't be removed" : undefined}
+									aria-describedby={onlyOne ? 'last-passkey-hint' : undefined}
 									disabled={onlyOne}
 									onclick={() => {
 										removeFor = p;

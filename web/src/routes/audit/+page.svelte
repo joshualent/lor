@@ -32,6 +32,7 @@
 	const VIEW_PAGE = 25;
 	let pageIndex = $state(0);
 	let historyActive = $state(false);
+	let headSnapshot = $state<AuditEvent[] | null>(null);
 
 	let actor = $state(page.url.searchParams.get('actor') ?? '');
 	let action = $state(page.url.searchParams.get('action') ?? '');
@@ -64,6 +65,7 @@
 		queryFn: () => fetchAudit(filter),
 		refetchInterval: loadingMore || historyActive ? false : 15_000,
 		refetchOnWindowFocus: !loadingMore && !historyActive,
+		refetchOnReconnect: !loadingMore && !historyActive,
 		placeholderData: keepPreviousData,
 		enabled: !grantFilter.error
 	}));
@@ -71,6 +73,7 @@
 		historyGeneration++;
 		pageIndex = 0;
 		historyActive = false;
+		headSnapshot = null;
 		older = [];
 		olderDone = false;
 		loadingMore = false;
@@ -113,16 +116,27 @@
 
 	const names = useNames();
 
-	const allEvents = $derived([...(q.data ?? []), ...older]);
+	const allEvents = $derived([
+		...(historyActive ? (headSnapshot ?? []) : (q.data ?? [])),
+		...older
+	]);
 	const events = $derived(allEvents.slice(pageIndex * VIEW_PAGE, (pageIndex + 1) * VIEW_PAGE));
 	const groups = $derived(groupByDay(events, clock.now));
 	const hasMore = $derived(
 		!q.isPlaceholderData &&
 			!olderDone &&
-			(older.length ? older.length % PAGE === 0 : (q.data?.length ?? 0) >= PAGE)
+			(older.length
+				? older.length % PAGE === 0
+				: ((historyActive ? headSnapshot?.length : q.data?.length) ?? 0) >= PAGE)
 	);
 	const canGoOlder = $derived((pageIndex + 1) * VIEW_PAGE < allEvents.length || hasMore);
 	const pagingBusy = $derived(loadingMore || q.isFetching || q.isPlaceholderData);
+	const pageable = $derived(historyActive || canGoOlder || q.isPlaceholderData);
+	const eventRange = $derived(
+		events.length === 1
+			? `Event ${pageIndex * VIEW_PAGE + 1}`
+			: `Events ${pageIndex * VIEW_PAGE + 1}–${pageIndex * VIEW_PAGE + events.length}`
+	);
 	const filtered = $derived(!!(filter.actor || filter.action || grant.trim()));
 
 	// The category chips, plus the current prefix if it came from a link.
@@ -134,6 +148,7 @@
 
 	async function olderPage() {
 		if (pagingBusy || grantFilter.error) return;
+		if (!historyActive) headSnapshot = [...(q.data ?? [])];
 		historyActive = true;
 		if ((pageIndex + 1) * VIEW_PAGE < allEvents.length) {
 			moreError = null;
@@ -158,8 +173,8 @@
 			older = [...older, ...next];
 			if (next.length) {
 				pageIndex++;
-				void focusPages(revision);
 			}
+			void focusPages(revision);
 		} catch (e) {
 			if (revision === historyGeneration) moreError = e;
 		} finally {
@@ -261,36 +276,40 @@
 		tabindex="-1"
 		aria-label={footer ? 'Audit pages footer' : 'Audit pages'}
 		aria-busy={loadingMore}
-		class="scroll-mt-24 space-y-1 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+		class="scroll-mt-24 space-y-1 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring sm:max-w-md"
 	>
-		<div class="flex items-center justify-between gap-1">
-			<Button
-				variant="secondary"
-				class="min-h-11 gap-1 px-3 text-footnote"
-				aria-label="Newer events"
-				disabled={pageIndex === 0 || pagingBusy}
-				onclick={newerPage}
+		{#if !footer || pageable}<div
+				class="flex items-center justify-between gap-1 sm:justify-start sm:gap-3"
 			>
-				<ChevronLeft class="size-3.5" /> Newer
-			</Button>
-			<span
-				class="min-w-0 text-center text-footnote wrap-anywhere text-muted-foreground nums"
-				aria-live={footer ? 'off' : 'polite'}
-			>
-				Events {pageIndex * VIEW_PAGE + 1}–{pageIndex * VIEW_PAGE + events.length}
-			</span>
-			<Button
-				variant="secondary"
-				class="min-h-11 gap-1 px-3 text-footnote"
-				aria-label="Older events"
-				disabled={!canGoOlder || pagingBusy}
-				onclick={olderPage}
-			>
-				Older {#if loadingMore}<Spinner class="size-3.5" />{:else}<ChevronRight
-						class="size-3.5"
-					/>{/if}
-			</Button>
-		</div>
+				{#if pageable}<Button
+						variant="secondary"
+						class="min-h-11 gap-1 px-3 text-footnote"
+						aria-label="Newer events"
+						disabled={pageIndex === 0 || pagingBusy}
+						onclick={newerPage}
+					>
+						<ChevronLeft class="size-3.5" /> Newer
+					</Button>{/if}
+				<span
+					class="min-w-0 text-center text-footnote wrap-anywhere text-muted-foreground nums"
+					aria-live={footer ? 'off' : 'polite'}
+				>
+					{eventRange}{#if !canGoOlder && !q.isPlaceholderData}<span class="sr-only"
+							>. End of recorded history.</span
+						>{/if}
+				</span>
+				{#if pageable}<Button
+						variant="secondary"
+						class="min-h-11 gap-1 px-3 text-footnote"
+						aria-label="Older events"
+						disabled={!canGoOlder || pagingBusy}
+						onclick={olderPage}
+					>
+						Older {#if loadingMore}<Spinner class="size-3.5" />{:else}<ChevronRight
+								class="size-3.5"
+							/>{/if}
+					</Button>{/if}
+			</div>{/if}
 		{#if historyActive || footer}
 			<div
 				class="flex flex-wrap items-center justify-between gap-x-3 text-footnote text-muted-foreground"
@@ -308,7 +327,8 @@
 		{/if}
 		{#if moreError}
 			<p class="text-footnote text-destructive" role={footer ? undefined : 'alert'}>
-				Couldn't load older events: {errorMessage(moreError)} Select Older to try again.
+				Couldn't load older events: {errorMessage(moreError)}
+				<span class="block">Select Older to try again.</span>
 			</p>
 		{/if}
 		{#if footer && !canGoOlder && !q.isPlaceholderData}

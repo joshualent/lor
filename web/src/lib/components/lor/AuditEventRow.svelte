@@ -36,7 +36,7 @@
 			actor.label,
 			agent && agent !== actor.name ? agent : undefined,
 			host,
-			ev.grant_id ? `grant #${ev.grant_id}` : undefined
+			ev.grant_id ? `grant\u00a0#${ev.grant_id}` : undefined
 		]
 			.filter(Boolean)
 			.join(' · ');
@@ -60,7 +60,10 @@
 	{#snippet leading()}<IconTile icon={look.icon} tone={look.tone} size="sm" />{/snippet}
 	{#snippet titleContent()}
 		<span class="inline-flex items-center gap-2 text-callout font-medium"
-			><StatusDot tone={look.tone} class="min-[360px]:hidden" />{look.label}</span
+			><StatusDot
+				tone={look.tone === 'violet' || look.tone === 'teal' ? 'neutral' : look.tone}
+				class="min-[360px]:hidden"
+			/>{look.label}</span
 		>
 	{/snippet}
 	{#snippet subtitleContent()}<span class="text-footnote">{subtitle}</span>{/snippet}

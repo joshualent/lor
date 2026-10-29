@@ -204,7 +204,10 @@
 					<span class="text-footnote text-muted-foreground"
 						>Request #{g.id} · {formatAgo(Date.parse(g.requested_at), clock.now)}</span
 					>
-					<Button href="#agent-reason" variant="secondary" class="min-h-11 text-footnote"
+					<Button
+						href="#agent-reason"
+						variant="secondary"
+						class="min-h-11 text-footnote sm:bg-transparent sm:px-0 sm:text-primary sm:hover:bg-transparent sm:hover:underline"
 						>Read full reason</Button
 					>
 					<div
