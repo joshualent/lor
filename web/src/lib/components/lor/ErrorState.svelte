@@ -38,6 +38,9 @@
 	{variant}
 	role="alert"
 >
+	{#if notFound}<p class="mt-3 max-w-sm text-callout text-muted-foreground">
+			Check that the link is complete, or use the button below to return.
+		</p>{/if}
 	{#snippet action()}
 		{#if onretry && !notFound}
 			<Button variant="secondary" disabled={fetching} onclick={onretry}

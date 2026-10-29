@@ -25,7 +25,7 @@
 	<span class={styles.label()}
 		><span class="flex items-center gap-2"
 			><Icon class="hidden size-4 sm:block" aria-hidden="true" />{label}</span
-		><ArrowUpRight class="hidden size-3.5 text-icon-muted sm:block" aria-hidden="true" /></span
+		><ArrowUpRight class="size-3.5 shrink-0 text-icon-muted" aria-hidden="true" /></span
 	>
 	<span class={styles.value({ class: value > 0 ? toneText[tone] : 'text-foreground' })}
 		>{value}</span

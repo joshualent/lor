@@ -199,6 +199,16 @@ export const listRowVariants = tv({
 			},
 			false: {}
 		},
+		stackMeta: {
+			true: {
+				main: 'grid grid-cols-[auto_minmax(0,1fr)_auto] gap-y-1 sm:flex',
+				leading: 'row-span-2',
+				content: 'col-start-2 row-start-1',
+				meta: 'col-start-2 row-start-2 flex-row flex-wrap items-center justify-start text-left sm:flex-col sm:items-end sm:text-right',
+				chevron: 'col-start-3 row-span-2 row-start-1 self-center'
+			},
+			false: {}
+		},
 		hasTrailing: { true: { main: 'pr-2' }, false: {} },
 		density: {
 			default: { main: 'min-h-16 py-3.5' },

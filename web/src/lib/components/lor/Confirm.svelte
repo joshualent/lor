@@ -20,18 +20,49 @@
 		footer: Snippet;
 	} = $props();
 
+	let bodyElement = $state<HTMLDivElement | null>(null);
+	let moreBelow = $state(false);
+	$effect(() => {
+		const el = bodyElement;
+		if (!el) {
+			moreBelow = false;
+			return;
+		}
+		const update = () => {
+			moreBelow = el.scrollHeight - el.scrollTop > el.clientHeight + 4;
+		};
+		const observer = new ResizeObserver(update);
+		observer.observe(el);
+		if (el.firstElementChild) observer.observe(el.firstElementChild);
+		el.addEventListener('scroll', update);
+		update();
+		return () => {
+			observer.disconnect();
+			el.removeEventListener('scroll', update);
+		};
+	});
 	const desktop = new MediaQuery('min-width: 768px');
 </script>
 
 {#if desktop.current}
 	<Dialog.Root bind:open>
-		<Dialog.Content>
-			<Dialog.Header>
+		<Dialog.Content class="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden">
+			<Dialog.Header class="shrink-0 pr-6">
 				<Dialog.Title>{title}</Dialog.Title>
 				{#if description}<Dialog.Description>{description}</Dialog.Description>{/if}
 			</Dialog.Header>
-			{@render children?.()}
-			<Dialog.Footer class="gap-2">{@render footer()}</Dialog.Footer>
+			{#if children}<div
+					bind:this={bodyElement}
+					class="-mx-1 min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 py-1"
+				>
+					{@render children()}
+				</div>{/if}
+			{#if moreBelow}<p class="shrink-0 text-center text-caption text-muted-foreground">
+					↓ Scroll for more details
+				</p>{/if}
+			<Dialog.Footer class="shrink-0 gap-2 border-t border-separator pt-4"
+				>{@render footer()}</Dialog.Footer
+			>
 		</Dialog.Content>
 	</Dialog.Root>
 {:else}
@@ -44,10 +75,16 @@
 					{#if description}<Drawer.Description>{description}</Drawer.Description>{/if}
 				</Drawer.Header>
 				{#if children}
-					<div class="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
+					<div
+						bind:this={bodyElement}
+						class="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1"
+					>
 						{@render children()}
 					</div>
 				{/if}
+				{#if moreBelow}<p class="shrink-0 pt-2 text-center text-caption text-muted-foreground">
+						↓ Scroll for more details
+					</p>{/if}
 				<Drawer.Footer
 					class="shrink-0 border-t border-separator px-0 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
 					>{@render footer()}</Drawer.Footer

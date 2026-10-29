@@ -53,6 +53,7 @@ values or Tailwind palette colors (`text-red-400`) in components.
 | `popover` | `#2f2f34` | dialogs, drawers, toasts |
 | `secondary` | `#36363c` | quiet buttons, selected nav item and segment |
 | `muted` | `#2f2f34` | code wells, expanded audit details |
+| `control-border` | `#85858e` | input, select, textarea and checkbox outlines (at least 3:1 against their fill) |
 | `border` | `#3a3a40` | card and input edges |
 | `separator` | `#36363b` | hairlines between rows inside a card |
 | `foreground` / `muted-foreground` | `#ececee` / `#a9a9b2` | primary / secondary text |
@@ -144,7 +145,7 @@ The merge helpers (`cn()` and tailwind-variants) are configured
 | Component | Purpose |
 |---|---|
 | `List` | grouped inset list (`<ul>`/`<ol>`, card surface, hairline dividers) |
-| `ListRow` | link (`href`), button (`onclick`) or static row: `leading`, title/subtitle, `meta`, chevron, separate `trailing` controls, disclosure (`expanded`/`controls`: a chevron-down that turns, distinct from the navigation chevron), `tone`, `density` |
+| `ListRow` | link (`href`), button (`onclick`) or static row: `leading`, title/subtitle, `meta`, chevron, separate `trailing` controls, disclosure (`expanded`/`controls`: a chevron-down that turns, distinct from the navigation chevron), `tone`, `density`, phone metadata stacking |
 | `DescriptionList` / `DescriptionItem` | label/value pairs, `inline` or `stacked`, `mono` |
 | `SettingsRow` | a setting with icon, description and a control (`Switch`, button) labelled and described via `for` |
 | `AuditEventRow` | outcome-toned category icon, label, who · what · grant, time; discloses details |
@@ -184,17 +185,17 @@ The merge helpers (`cn()` and tailwind-variants) are configured
 | `Warnings` | server warnings for the selected level (`data-warning`) |
 | `UnverifiedText` | agent-written text: plain text, in full, labelled unverified |
 | `CopyField` | command/message with copy button (announces "Copied") |
-| `EmptyState` | icon, title (a heading), one sentence, next step; `inset`/`page`/`plain` |
+| `EmptyState` | icon, title (a heading), one sentence, next step; `inset`/`page`/`plain`, compact size for dashboard secondary states |
 | `ErrorState` | failed first load: server message as is, retry, way out; 404-aware |
 | `StaleNotice` | a background refresh failed: keep showing the last data, say how old, retry |
-| `ListSkeleton`, `PageSkeleton`, `ui/skeleton` | loading placeholders (`aria-busy` + "Loading…") |
+| `ListSkeleton`, `PageSkeleton`, `ui/skeleton` | loading placeholders (`aria-busy` + "Loading…"); dashboard layout includes summary cards and its two list regions |
 | `ui/spinner` | in-button progress (e.g. while a passkey prompt is open) |
-| `Confirm` | dialog on wide screens, bottom drawer on phones (body scrolls, footer stays visible) |
+| `Confirm` | dialog on wide screens, bottom drawer on phones (bounded height, scrolling body, visible footer and overflow cue) |
 | `ui/sonner` | toasts with tone-colored icons |
 
 ## Patterns
 
-- **Workspace:** desktop navigation uses a 208 px rail from 1024 px; phones and tablets use a sticky header with five labelled destinations. Main lists use the available width; forms and detail pages stay at a readable 768 px maximum. The Home dashboard places decisions beside live access from 1280 px; Settings groups security controls beside read-only server configuration.
+- **Workspace:** desktop navigation uses a 208 px rail from 1024 px; phones and tablets use a compact sticky navigation with five labelled destinations. Main lists use the available width; forms and detail pages stay at a readable 768 px maximum. The Home dashboard places decisions beside live access from 1280 px; Settings groups security controls beside read-only server configuration.
 - **Page anatomy:** `PageHeader` → (callouts) → `Section`s, each a header plus
   a `List`, `DescriptionList` or `Card`. No hand-rolled surfaces in pages.
 - **List → detail:** list rows link to a detail page with a back link
@@ -265,3 +266,10 @@ Don't:
 3. Add it to the gallery (`src/routes/gallery/+page.svelte`) with its
    variants, and to the inventory above.
 4. Pure logic (mapping, formatting) goes in a `.ts` module with a Vitest spec.
+
+## Interaction details
+
+- Home sorts active access by expiry and links directly to a grant expiring within five minutes. Summary links work in both zero and nonzero states.
+- Consent repeats the selected level and duration near its header, alongside the requested duration when it differs, and offers a direct jump to the controls. Full server warnings and the agent's reason remain visible as plain text.
+- Audit uses a native category picker on phones and wrapping chips on larger screens. Grant-number entry is debounced; a new filter keeps previous results with an explicit updating notice until matching data arrives.
+- Disabling an agent requires confirmation naming its consequences. A failed disable or sign-out keeps the current view available for retry. Backend authentication and authorization requirements are unchanged.

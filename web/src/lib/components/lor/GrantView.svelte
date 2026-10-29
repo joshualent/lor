@@ -4,7 +4,6 @@
 	// /r/[id] (approval links) and /grants/[id].
 	import KeyRound from '@lucide/svelte/icons/key-round';
 	import TimerReset from '@lucide/svelte/icons/timer-reset';
-	import Check from '@lucide/svelte/icons/check';
 	import FileBadge from '@lucide/svelte/icons/file-badge';
 	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { toast } from 'svelte-sonner';
@@ -205,6 +204,24 @@
 					<span class="text-footnote text-muted-foreground"
 						>Request #{g.id} · {formatAgo(Date.parse(g.requested_at), clock.now)}</span
 					>
+					<div
+						class="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-separator pt-2 text-callout"
+					>
+						<span
+							>Selected: <strong>{level === 'sudo' ? 'sudo (root)' : 'standard user'}</strong> · {durationValid
+								? formatDuration(duration)
+								: 'Choose a duration'}{#if durationValid && duration !== g.requested_duration_s}<span
+									class="text-footnote text-muted-foreground"
+								>
+									· requested {formatDuration(g.requested_duration_s ?? 0)}</span
+								>{/if}</span
+						>
+						<a
+							href="#access-choices"
+							class="inline-flex min-h-10 items-center rounded-md text-primary focus-ring"
+							>Change access</a
+						>
+					</div>
 				{/snippet}
 			</PageHeader>
 
@@ -228,7 +245,7 @@
 				</DescriptionList>
 			</Section>
 
-			<Section title="Level">
+			<Section id="access-choices" title="Level">
 				<div class="space-y-2" role="radiogroup" aria-label="Level">
 					{#each g.consent.levels as l (l)}
 						{#if l === 'sudo'}
@@ -278,7 +295,8 @@
 				<ul class="space-y-2 rounded-xl bg-card px-4 py-3">
 					{#each g.consent.limits as lim (lim)}
 						<li class="flex gap-2.5 text-callout text-muted-foreground">
-							<Check class="mt-0.5 size-4 shrink-0 text-success" aria-hidden="true" />{lim}
+							<span class="mt-2 size-1 shrink-0 rounded-full bg-icon-muted" aria-hidden="true"
+							></span>{lim}
 						</li>
 					{/each}
 				</ul>

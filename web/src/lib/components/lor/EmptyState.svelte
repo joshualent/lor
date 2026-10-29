@@ -13,6 +13,7 @@
 		description,
 		tone = 'neutral',
 		variant = 'inset',
+		size = 'default',
 		action,
 		children,
 		role,
@@ -23,6 +24,7 @@
 		description?: string;
 		tone?: Tone;
 		variant?: 'inset' | 'page' | 'plain';
+		size?: 'default' | 'compact';
 		action?: Snippet;
 		children?: Snippet;
 		role?: 'status' | 'alert';
@@ -37,12 +39,18 @@
 	{role}
 	class={cn(
 		'flex flex-col items-center px-6 text-center',
-		variant === 'inset' && 'rounded-xl bg-card py-10',
+		variant === 'inset' && 'rounded-xl bg-card',
+		variant === 'inset' && (size === 'compact' ? 'py-5' : 'py-10'),
 		variant === 'page' && 'py-16 sm:py-20',
 		variant === 'plain' && 'py-8'
 	)}
 >
-	{#if icon}<IconTile {icon} {tone} size="lg" class="mb-4" />{/if}
+	{#if icon}<IconTile
+			{icon}
+			{tone}
+			size={size === 'compact' ? 'md' : 'lg'}
+			class={size === 'compact' ? 'mb-2' : 'mb-4'}
+		/>{/if}
 	<svelte:element
 		this={tag}
 		class={variant === 'page' ? 'text-headline text-foreground' : 'text-heading text-foreground'}

@@ -2,7 +2,7 @@
 	import ScrollText from '@lucide/svelte/icons/scroll-text';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { createQuery } from '@tanstack/svelte-query';
+	import { createQuery, keepPreviousData } from '@tanstack/svelte-query';
 	import { clock } from '#lib/clock.svelte.js';
 	import { ACTOR_FILTERS, CATEGORY_FILTERS, groupByDay } from '#lib/audit.js';
 	import { errorMessage } from '#lib/errors.js';
@@ -21,6 +21,7 @@
 	import Section from '#lib/components/lor/Section.svelte';
 	import SegmentedControl from '#lib/components/lor/SegmentedControl.svelte';
 	import Toolbar from '#lib/components/lor/Toolbar.svelte';
+	import { NativeSelect } from '#lib/components/ui/native-select/index.js';
 	import StaleNotice from '#lib/components/lor/StaleNotice.svelte';
 
 	const PAGE = 100;
@@ -28,6 +29,14 @@
 	let actor = $state(page.url.searchParams.get('actor') ?? '');
 	let action = $state(page.url.searchParams.get('action') ?? '');
 	let grant = $state(page.url.searchParams.get('grant_id') ?? '');
+	let grantQuery = $state(page.url.searchParams.get('grant_id') ?? '');
+	$effect(() => {
+		const value = grant;
+		const timer = setTimeout(() => {
+			grantQuery = value;
+		}, 250);
+		return () => clearTimeout(timer);
+	});
 	let older = $state<AuditEvent[]>([]);
 	let olderDone = $state(false);
 	let loadingMore = $state(false);
@@ -36,12 +45,13 @@
 	const filter = $derived({
 		actor: actor || undefined,
 		action: action.trim() || undefined,
-		grant_id: Number(grant) || undefined
+		grant_id: Number(grantQuery) || undefined
 	});
 	const q = createQuery(() => ({
 		queryKey: keys.audit(filter),
 		queryFn: () => fetchAudit(filter),
-		refetchInterval: 15_000
+		refetchInterval: 15_000,
+		placeholderData: keepPreviousData
 	}));
 	$effect(() => {
 		void filter;
@@ -65,7 +75,9 @@
 	const events = $derived([...(q.data ?? []), ...older]);
 	const groups = $derived(groupByDay(events, clock.now));
 	const hasMore = $derived(
-		!olderDone && (older.length ? older.length % PAGE === 0 : (q.data?.length ?? 0) >= PAGE)
+		!q.isPlaceholderData &&
+			!olderDone &&
+			(older.length ? older.length % PAGE === 0 : (q.data?.length ?? 0) >= PAGE)
 	);
 	const filtered = $derived(!!(filter.actor || filter.action || filter.grant_id));
 
@@ -96,6 +108,7 @@
 		actor = '';
 		action = '';
 		grant = '';
+		grantQuery = '';
 	}
 </script>
 
@@ -117,12 +130,20 @@
 		fill
 	/>
 	<div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+		<div class="sm:hidden">
+			<label for="audit-category" class="mb-1 block text-footnote text-muted-foreground"
+				>Category</label
+			><NativeSelect id="audit-category" bind:value={action}
+				>{#each categories as c (c.prefix)}<option value={c.prefix}
+						>{c.prefix ? c.label : 'All categories'}</option
+					>{/each}</NativeSelect
+			>
+		</div>
 		<ChipGroup
 			label="Category"
-			scroll
 			bind:value={action}
 			options={categories.map((c) => ({ value: c.prefix, label: c.label }))}
-			class="sm:flex-1"
+			class="hidden sm:flex sm:flex-1"
 		/>
 		<SearchField
 			bind:value={grant}
@@ -158,7 +179,13 @@
 		{/snippet}
 	</EmptyState>
 {:else}
-	<div class="space-y-6" data-testid="audit-log">
+	{#if q.isPlaceholderData}<p
+			role="status"
+			class="mb-4 flex items-center gap-2 text-footnote text-muted-foreground"
+		>
+			<Spinner class="size-3.5" /> Updating results… Previous results are shown below.
+		</p>{/if}
+	<div class="space-y-6" data-testid="audit-log" aria-busy={q.isPlaceholderData}>
 		{#each groups as group (group.key)}
 			<Section title={group.label} count={group.events.length}>
 				<List ordered>

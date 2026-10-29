@@ -76,6 +76,23 @@ describe('non-text contrast (3:1)', () => {
 	}
 	it('the sudo confirmation checkbox outline on its amber panel', () =>
 		expectContrast('warning', 'warning-tint', 3));
+	for (const surface of ['background', 'card', 'popover']) {
+		it(`control border on a filled input over ${surface}`, () => {
+			const blended =
+				'#' +
+				[1, 3, 5]
+					.map((offset) =>
+						Math.round(
+							parseInt(vars.input.slice(offset, offset + 2), 16) * 0.3 +
+								parseInt(vars[surface].slice(offset, offset + 2), 16) * 0.7
+						)
+							.toString(16)
+							.padStart(2, '0')
+					)
+					.join('');
+			expect(contrast(vars['control-border'], blended)).toBeGreaterThanOrEqual(3);
+		});
+	}
 	it('tone edges are visible against their tint', () => {
 		for (const t of tones) {
 			expect(contrast(vars[`${t}-edge`], vars[`${t}-tint`])).toBeGreaterThan(1.2);

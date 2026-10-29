@@ -88,7 +88,7 @@
 </PageHeader>
 
 {#snippet hostRows(list: Host[])}
-	<List>
+	<List label="Hosts">
 		{#each list as h (h.id)}
 			{@const look = hostLook(h, true)}
 			<ListRow href="/hosts/{h.name}">

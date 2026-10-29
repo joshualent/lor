@@ -36,6 +36,7 @@
 	--border: #3a3a40; /* card edges, dividers between sections */
 	--separator: #36363b; /* hairlines between rows inside a card */
 	--input: #45454c;
+	--control-border: #85858e; /* interactive boundaries, >=3:1 on input fills */
 	--ring: #9db9ee;
 	--icon-muted: #85858e; /* chevrons and decorative icons (non-text, ≥ 3:1) */
 
@@ -121,6 +122,7 @@
 	--color-border: var(--border);
 	--color-separator: var(--separator);
 	--color-input: var(--input);
+	--color-control-border: var(--control-border);
 	--color-ring: var(--ring);
 	--color-icon-muted: var(--icon-muted);
 
@@ -219,6 +221,6 @@
 /* Keep anchor targets clear of the two-row phone navigation. */
 @media (max-width: 63.999rem) {
 	[data-slot='section'] {
-		scroll-margin-top: 10rem;
+		scroll-margin-top: 6rem;
 	}
 }

@@ -2,6 +2,7 @@
 	// One audit event: outcome-toned category icon, what happened, who did
 	// it and when. Tapping it discloses the recorded details and a link to
 	// the grant.
+	import { Button } from '#lib/components/ui/button/index.js';
 	import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
 	import type { AuditEvent } from '#lib/queries.js';
 	import type { Names } from '#lib/names.svelte.js';
@@ -78,10 +79,8 @@
 					</dl>
 				{/if}
 				{#if ev.grant_id}
-					<a
-						href="/grants/{ev.grant_id}"
-						class="inline-flex items-center gap-1 pt-1 text-footnote font-medium text-primary"
-						>Open grant #{ev.grant_id}<ArrowUpRight class="size-3.5" aria-hidden="true" /></a
+					<Button variant="link" size="sm" href="/grants/{ev.grant_id}"
+						>Open grant #{ev.grant_id}<ArrowUpRight class="size-3.5" aria-hidden="true" /></Button
 					>
 				{/if}
 			</div>

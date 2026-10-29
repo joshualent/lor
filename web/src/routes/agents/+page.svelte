@@ -60,6 +60,7 @@
 	let editOpen = $state(false);
 	let editIps = $state('');
 	let rotateOpen = $state(false);
+	let disableOpen = $state(false);
 
 	const splitIps = (s: string) => s.split(/[\s,]+/).filter(Boolean);
 
@@ -124,6 +125,8 @@
 	}
 
 	async function setStatus(a: Agent, status: 'active' | 'disabled') {
+		if (busy) return;
+		busy = true;
 		try {
 			await call(
 				api.POST('/agents/{id}/status', { params: { path: { id: a.id } }, body: { status } })
@@ -134,9 +137,12 @@
 					: `${a.name} enabled`
 			);
 			sheetOpen = false;
+			disableOpen = false;
 			refresh();
 		} catch (e) {
 			toast.error(errorMessage(e));
+		} finally {
+			busy = false;
 		}
 	}
 
@@ -211,16 +217,18 @@
 				title="No matching agents"
 				description="Try another name or address."
 			/>{:else}
-			<List>
+			<List label="Agents">
 				{#each matching as a (a.id)}
 					{@const look = agentLook(a)}
-					<ListRow onclick={() => openSheet(a)} chevron disabled={false}>
+					<ListRow stackMeta onclick={() => openSheet(a)} chevron disabled={false}>
 						{#snippet leading()}<IconTile text={a.name} tone={look.tone} />{/snippet}
 						{#snippet titleContent()}
 							<span class={a.status === 'disabled' ? 'text-muted-foreground' : ''}>{a.name}</span>
 						{/snippet}
 						{#snippet subtitleContent()}
-							<span class="font-mono text-footnote">{a.lan_addrs.join(', ')}</span>
+							<span class="block font-mono text-footnote wrap-anywhere"
+								>{a.lan_addrs.join(', ')}</span
+							>
 						{/snippet}
 						{#snippet metaContent()}
 							{#if look.badge}
@@ -283,7 +291,7 @@
 				</ListRow>
 				{#if selected.status === 'active'}
 					<ListRow
-						onclick={() => setStatus(selected, 'disabled')}
+						onclick={() => fromSheet(() => (disableOpen = true))}
 						title="Disable"
 						subtitle="Ends its open grants and offers"
 						tone="danger"
@@ -382,5 +390,21 @@
 	{#snippet footer()}
 		<Button variant="outline" onclick={() => (rotateOpen = false)}>Cancel</Button>
 		<Button variant="destructive" disabled={busy} onclick={rotate}>Rotate</Button>
+	{/snippet}
+</Confirm>
+
+<Confirm
+	bind:open={disableOpen}
+	title="Disable {selected?.name ?? 'agent'}?"
+	description="This ends the agent's open grants and offers and denies its pending requests. Re-enabling it will not restore access."
+>
+	{#snippet footer()}
+		<Button variant="outline" disabled={busy} onclick={() => (disableOpen = false)}>Cancel</Button>
+		<Button
+			variant="destructive"
+			disabled={busy}
+			onclick={() => selected && setStatus(selected, 'disabled')}
+			>{#if busy}<Spinner />{/if}{busy ? 'Disabling…' : 'Disable agent'}</Button
+		>
 	{/snippet}
 </Confirm>

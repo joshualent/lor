@@ -79,6 +79,19 @@
 	const pendingCount = $derived(
 		(d?.pending_requests.length ?? 0) + (d?.pending_extensions.length ?? 0)
 	);
+	const activeByExpiry = $derived(
+		[...(d?.active ?? [])].sort(
+			(a, b) => Date.parse(a.valid_before ?? '') - Date.parse(b.valid_before ?? '')
+		)
+	);
+	const expiring = $derived(
+		activeByExpiry.filter(
+			(g) =>
+				g.valid_before &&
+				Date.parse(g.valid_before) > clock.now &&
+				Date.parse(g.valid_before) - clock.now <= 5 * 60_000
+		)
+	);
 	const hasCommands = $derived(!!d?.active.some((g) => g.last_command));
 	let revoking = $state(false);
 </script>
@@ -120,7 +133,7 @@
 	/>{/if}
 
 {#if q.isPending}
-	<PageSkeleton header={false} sections={3} />
+	<PageSkeleton header={false} layout="dashboard" />
 {:else if q.isError && !q.data}
 	<ErrorState error={q.error} fetching={q.isFetching} onretry={() => q.refetch()} />
 {:else if d}
@@ -150,8 +163,20 @@
 			tone="info"
 		/>
 	</nav>
+	{#if expiring.length}
+		<a
+			href="/grants/{expiring[0].id}"
+			class="-mt-3 mb-6 flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-1 text-callout text-warning no-underline! focus-ring"
+			><Clock class="size-4" aria-hidden="true" /><span
+				>{expiring[0].host.name} access expires in <Countdown
+					end={expiring[0].valid_before}
+					suffix=""
+				/>{expiring.length > 1 ? ` · ${expiring.length} expiring soon` : ''}</span
+			><span class="ml-auto underline underline-offset-4">Review access</span></a
+		>
+	{/if}
 	<div class="grid items-start gap-8 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-		<div class="min-w-0 space-y-8">
+		<div class="min-w-0 space-y-8 xl:col-start-1 xl:row-start-1">
 			{#if pendingCount > 0}
 				<Section
 					id="waiting"
@@ -218,16 +243,18 @@
 				<Section id="waiting" title="Waiting for you" count={0}>
 					<EmptyState
 						icon={Inbox}
+						size="compact"
 						title="You're all caught up"
 						description="New access requests and extensions appear here for your review."
 					/>
 				</Section>
 			{/if}
 		</div>
-		<div class="min-w-0 space-y-8">
+		<div class="min-w-0 space-y-8 xl:col-start-2 xl:row-span-2 xl:row-start-1">
 			{#snippet grantRow(g: Summary)}
 				{@const look = hostLook(g.host)}
 				<ListRow
+					stackMeta
 					href="/grants/{g.id}"
 					label="{g.host.name}, {g.agent.name}{g.level === 'sudo' ? ', sudo' : ''}{g.status ===
 					'offered'
@@ -282,18 +309,13 @@
 				{#if d.active.length === 0}
 					<EmptyState
 						icon={ShieldCheck}
+						size="compact"
 						title="No agent has access"
 						description="Access starts when you approve a request or grant it ahead of time."
-					>
-						{#snippet action()}
-							{#if d.offered.length === 0}
-								<Button variant="secondary" href="/grants/new"><Plus /> Grant access</Button>
-							{/if}
-						{/snippet}
-					</EmptyState>
+					></EmptyState>
 				{:else}
 					<List data-testid="active-grants">
-						{#each d.active as g (g.id)}{@render grantRow(g)}{/each}
+						{#each activeByExpiry as g (g.id)}{@render grantRow(g)}{/each}
 					</List>
 				{/if}
 			</Section>
@@ -318,7 +340,7 @@
 				>
 			{/if}
 		</div>
-		<Section class="xl:col-span-2" title="Recent activity">
+		<Section class="xl:col-start-1 xl:row-start-2" title="Recent activity">
 			{#snippet action()}
 				<Button variant="ghost" size="sm" href="/audit" class="text-muted-foreground"
 					>View all</Button

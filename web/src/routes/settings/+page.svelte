@@ -106,14 +106,20 @@
 		}
 	}
 	async function signOut() {
-		await call(api.POST('/logout', { body: {} })).catch(() => {});
-		qc.clear();
-		await goto('/login', { replaceState: true });
+		if (busy) return;
+		if (await act(() => call(api.POST('/logout', { body: {} })), 'Signed out')) {
+			qc.clear();
+			await goto('/login', { replaceState: true });
+		}
 	}
 	async function signOutEverywhere() {
-		await act(() => call(api.POST('/sessions/revoke-all', { body: {} })), 'Signed out everywhere');
-		qc.clear();
-		await goto('/login', { replaceState: true });
+		if (busy) return;
+		if (
+			await act(() => call(api.POST('/sessions/revoke-all', { body: {} })), 'Signed out everywhere')
+		) {
+			qc.clear();
+			await goto('/login', { replaceState: true });
+		}
 	}
 
 	const DEVICE_ICONS = { phone: Smartphone, tablet: Tablet, desktop: Laptop, unknown: Globe };
@@ -159,11 +165,13 @@
 			{:else}
 				<List>
 					{#each passkeys.data ?? [] as p (p.id)}
-						<ListRow
-							subtitle="Added {formatTimestamp(Date.parse(p.created_at))}{p.last_used_at
-								? ` · used ${formatAgo(Date.parse(p.last_used_at), clock.now)}`
-								: ''}"
-						>
+						<ListRow>
+							{#snippet subtitleContent()}<time
+									datetime={p.created_at}
+									title={formatTimestamp(Date.parse(p.created_at))}
+									>Added {formatAgo(Date.parse(p.created_at), clock.now)}</time
+								>{#if p.last_used_at}
+									· used {formatAgo(Date.parse(p.last_used_at), clock.now)}{/if}{/snippet}
 							{#snippet leading()}<IconTile icon={KeyRound} tone="info" />{/snippet}
 							{#snippet titleContent()}
 								<span class="flex flex-wrap items-center gap-2">
@@ -244,10 +252,11 @@
 
 		<Section>
 			<List label="Sign out">
-				<ListRow onclick={signOut} title="Sign out" density="compact">
+				<ListRow disabled={busy} onclick={signOut} title="Sign out" density="compact">
 					{#snippet leading()}<IconTile icon={LogOut} size="sm" />{/snippet}
 				</ListRow>
 				<ListRow
+					disabled={busy}
 					onclick={() => (everywhereOpen = true)}
 					title="Sign out everywhere"
 					subtitle="Ends every session, including this one"
@@ -326,7 +335,11 @@
 	description="Every session ends, including this one."
 >
 	{#snippet footer()}
-		<Button variant="outline" onclick={() => (everywhereOpen = false)}>Cancel</Button>
-		<Button variant="destructive" onclick={signOutEverywhere}>Sign out everywhere</Button>
+		<Button variant="outline" disabled={busy} onclick={() => (everywhereOpen = false)}
+			>Cancel</Button
+		>
+		<Button variant="destructive" disabled={busy} onclick={signOutEverywhere}
+			>{#if busy}<Spinner />{/if}{busy ? 'Signing out…' : 'Sign out everywhere'}</Button
+		>
 	{/snippet}
 </Confirm>

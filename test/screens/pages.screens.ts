@@ -357,6 +357,14 @@ test('screens', async () => {
 			await p.getByRole('button', { name: /claude/ }).first().click();
 		}
 	});
+	await shoot('agents-disable', '/agents', {
+		fullPage: false,
+		prepare: async (p) => {
+			await p.getByRole('button', { name: /claude/ }).first().click();
+			await p.getByRole('button', { name: /Disable Ends/ }).click();
+			await expect(p.getByRole('heading', { name: 'Disable claude?' })).toBeVisible();
+		}
+	});
 	await shoot('hosts-add', '/hosts', {
 		fullPage: false,
 		prepare: async (p) => {

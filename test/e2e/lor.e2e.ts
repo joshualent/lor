@@ -255,3 +255,52 @@ test('navigation and inventories remain usable across phone, tablet and desktop 
 	await expect(page.getByRole('link', { name: /nas/ }).last()).toBeVisible();
 	await page.setViewportSize({ width: 1280, height: 720 });
 });
+
+test('failed sign-out keeps the session view and lets the admin retry', async () => {
+	await page.setViewportSize({ width: 1280, height: 800 });
+	await page.goto('/');
+	await page.route('**/api/admin/v1/logout', (r) => r.fulfill({ status: 500, json: { error: { code: 'test', message: 'Test sign-out failure' } } }));
+	await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+	await expect(page.getByRole('heading', { name: 'Home', exact: true })).toBeVisible();
+	await expect(page.getByText(/Couldn't sign out: Test sign-out failure/)).toBeVisible();
+	await page.goto('/settings');
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+	await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+	await page.unroute('**/api/admin/v1/logout');
+	await page.route('**/api/admin/v1/sessions/revoke-all', (r) => r.fulfill({ status: 500, json: { error: { code: 'test', message: 'Test revoke-all failure' } } }));
+	await page.getByRole('button', { name: /^Sign out everywhere/ }).click();
+	await expect(page.getByRole('heading', { name: 'Sign out everywhere?' })).toBeVisible();
+	await page.getByRole('button', { name: 'Sign out everywhere', exact: true }).click();
+	await expect(page.getByText('Test revoke-all failure')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Sign out everywhere?' })).toBeVisible();
+	await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+	await page.unroute('**/api/admin/v1/sessions/revoke-all');
+});
+
+test('disabling an agent requires confirmation and preserves retry after failure', async () => {
+	await page.goto('/agents');
+	await page.getByRole('button', { name: /claude/ }).first().click();
+	await page.getByRole('button', { name: /^Disable/ }).click();
+	await expect(page.getByRole('heading', { name: 'Disable claude?' })).toBeVisible();
+	await expect(page.getByText(/Re-enabling it will not restore access/)).toBeVisible();
+	await page.route('**/api/admin/v1/agents/*/status', (r) => r.fulfill({ status: 500, json: { error: { code: 'test', message: 'Test disable failure' } } }));
+	await page.getByRole('button', { name: 'Disable agent', exact: true }).click();
+	await expect(page.getByText('Test disable failure')).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Disable claude?' })).toBeVisible();
+	await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+	await page.unroute('**/api/admin/v1/agents/*/status');
+});
+
+test('confirmation actions stay in view in short desktop and phone windows', async () => {
+	for (const viewport of [{ width: 1280, height: 560 }, { width: 390, height: 500 }]) {
+		await page.setViewportSize(viewport);
+		await page.goto('/hosts');
+		await page.getByRole('button', { name: 'Add host', exact: true }).first().click();
+		await page.getByRole('switch', { name: 'Lor infrastructure' }).scrollIntoViewIfNeeded();
+		await expect(page.getByRole('button', { name: 'Add host', exact: true }).last()).toBeInViewport();
+		await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeInViewport();
+		await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+	}
+	await page.setViewportSize({ width: 1280, height: 800 });
+});

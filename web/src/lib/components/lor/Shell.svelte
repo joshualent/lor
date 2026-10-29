@@ -13,6 +13,8 @@
 	import Bot from '@lucide/svelte/icons/bot';
 	import ScrollText from '@lucide/svelte/icons/scroll-text';
 	import Settings2 from '@lucide/svelte/icons/settings-2';
+	import { toast } from 'svelte-sonner';
+	import { errorMessage } from '#lib/errors.js';
 	import LogOut from '@lucide/svelte/icons/log-out';
 	import CloudOff from '@lucide/svelte/icons/cloud-off';
 	import RotateCw from '@lucide/svelte/icons/rotate-cw';
@@ -71,10 +73,19 @@
 		return p.startsWith(href);
 	}
 
+	let signingOut = $state(false);
 	async function signOut() {
-		await call(api.POST('/logout', { body: {} })).catch(() => {});
-		qc.clear();
-		await goto('/login', { replaceState: true });
+		if (signingOut) return;
+		signingOut = true;
+		try {
+			await call(api.POST('/logout', { body: {} }));
+			qc.clear();
+			await goto('/login', { replaceState: true });
+		} catch (e) {
+			toast.error(`Couldn't sign out: ${errorMessage(e)}`);
+		} finally {
+			signingOut = false;
+		}
 	}
 
 	const ready = $derived(isPublic || session.data?.authenticated === true);
@@ -88,12 +99,10 @@
 	>
 	{#if !isPublic && session.data?.authenticated}
 		<header
-			class="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-md lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-52 lg:flex-col lg:border-r lg:border-b-0"
+			class="sticky top-0 z-30 flex items-center gap-1 border-b border-border bg-background/95 px-2 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur-md lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-52 lg:flex-col lg:gap-0 lg:border-r lg:border-b-0 lg:px-0 lg:py-0"
 			data-slot="app-navigation"
 		>
-			<div
-				class="flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 sm:px-6 lg:px-5 lg:pt-7 lg:pb-8"
-			>
+			<div class="hidden items-center justify-between lg:flex lg:px-5 lg:pt-7 lg:pb-8">
 				<a
 					href="/"
 					class="flex min-h-11 items-center gap-2.5 rounded-md no-underline! focus-ring"
@@ -107,16 +116,9 @@
 						></span
 					>
 				</a>
-				<Button
-					variant="ghost"
-					size="icon"
-					aria-label="Sign out"
-					onclick={signOut}
-					class="lg:hidden"><LogOut /></Button
-				>
 			</div>
 			<nav
-				class="grid grid-cols-5 gap-1 px-3 pb-3 sm:px-5 lg:flex lg:flex-col lg:gap-1.5 lg:px-3"
+				class="grid w-full grid-cols-5 gap-1 lg:flex lg:flex-col lg:gap-1.5 lg:px-3"
 				aria-label="Main"
 			>
 				{#each nav as n (n.href)}
@@ -142,10 +144,15 @@
 				<p
 					class="border-t border-border px-2 pt-4 text-footnote leading-relaxed text-muted-foreground"
 				>
-					Temporary access.<br />Your approval. Your control.
+					Temporary access.<br />Always approved by you.
 				</p>
-				<Button variant="ghost" onclick={signOut} class="w-full justify-start text-muted-foreground"
-					><LogOut /> Sign out</Button
+				<Button
+					variant="ghost"
+					disabled={signingOut}
+					onclick={signOut}
+					class="w-full justify-start text-muted-foreground"
+					>{#if signingOut}<Spinner />{:else}<LogOut />{/if}
+					{signingOut ? 'Signing out…' : 'Sign out'}</Button
 				>
 			</div>
 		</header>

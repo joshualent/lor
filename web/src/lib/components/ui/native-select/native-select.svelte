@@ -21,7 +21,7 @@
 		bind:this={ref}
 		bind:value
 		data-slot="native-select"
-		class="h-10 w-full min-w-0 cursor-pointer appearance-none rounded-md border border-input bg-input/30 py-1 pr-9 pl-3 text-base transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive/50 aria-invalid:ring-3 aria-invalid:ring-destructive/40 md:text-sm"
+		class="h-10 w-full min-w-0 cursor-pointer appearance-none rounded-md border border-control-border bg-input/30 py-1 pr-9 pl-3 text-base transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive/50 aria-invalid:ring-3 aria-invalid:ring-destructive/40 md:text-sm"
 		{...aria}
 		{...restProps}
 	>

@@ -17,6 +17,7 @@
 		meta,
 		chevron,
 		density = 'default',
+		stackMeta = false,
 		tone = 'default',
 		disabled = false,
 		expanded,
@@ -40,6 +41,8 @@
 		/** Defaults to true for links. */
 		chevron?: boolean;
 		density?: 'default' | 'compact' | 'relaxed';
+		/** Put metadata below the text on phones, for long addresses or summaries. */
+		stackMeta?: boolean;
 		tone?: 'default' | 'danger' | 'accent';
 		disabled?: boolean;
 		/** For disclosure rows (button): aria-expanded. */
@@ -62,7 +65,7 @@
 	const interactive = $derived(!!href || !!onclick);
 	const showChevron = $derived(chevron ?? !!href);
 	const s = $derived(
-		listRowVariants({ interactive, hasTrailing: !!trailing, density, tone, disabled })
+		listRowVariants({ interactive, hasTrailing: !!trailing, density, tone, disabled, stackMeta })
 	);
 </script>
 

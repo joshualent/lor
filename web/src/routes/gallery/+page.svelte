@@ -49,6 +49,7 @@
 	import LevelBadge from '#lib/components/lor/LevelBadge.svelte';
 	import List from '#lib/components/lor/List.svelte';
 	import ListRow from '#lib/components/lor/ListRow.svelte';
+	import PageSkeleton from '#lib/components/lor/PageSkeleton.svelte';
 	import ListSkeleton from '#lib/components/lor/ListSkeleton.svelte';
 	import PageHeader from '#lib/components/lor/PageHeader.svelte';
 	import SearchField from '#lib/components/lor/SearchField.svelte';
@@ -560,6 +561,13 @@
 				updatedAt={now - 2 * MIN}
 				onretry={() => {}}
 			/>
+			<EmptyState
+				size="compact"
+				icon={Inbox}
+				title="You're all caught up"
+				description="New requests appear here for review."
+			/>
+			<PageSkeleton header={false} layout="dashboard" />
 			<ListSkeleton rows={2} />
 			<div class="flex items-center gap-3">
 				<Skeleton shape="tile" />
