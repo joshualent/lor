@@ -261,7 +261,7 @@ tests pass, and all eight screenshot tests pass. The reconnect regression
 first failed against the previous bundle with two head reads instead of one,
 then passed against the corrected bundle. A screenshot assertion was updated
 to normalize the whitespace in the new identity paragraph; the rendered
-identity was correct. Fresh independent council scoring is pending.
+identity was correct. Final independent scoring is recorded below.
 
 
 ## Round 6 result and changes for round 7
@@ -290,8 +290,60 @@ pending captures come from the production browser suite with dependencies
 held until after visible assertions and capture; release assertions verify
 recovery. Both widths were visually checked. Standard checks pass, all 24
 production browser tests pass, and all eight seeded screenshot tests pass.
-Fresh independent council scoring is pending.
+Final independent scoring is recorded below.
 
+
+## Final round 7 acceptance
+
+All three fresh independent reviewers assessed UI commit `ebc627a` against
+this same 134-image set and read access to the source. All 39 ratings meet
+or exceed 8/10, with no material blocker reported. Sol and Terra ran at
+xhigh reasoning; Claude Opus 5.5 ran at high effort. The original two-model
+7/10 prerequisite was met in round 1 before Opus joined round 2.
+
+| Category | Sol | Terra | Opus 5.5 |
+|---|---:|---:|---:|
+| Usability | 8.5 | 8 | 8.5 |
+| Visual Hierarchy | 8.5 | 8 | 8.5 |
+| Consistency | 8.5 | 9 | 8 |
+| Responsiveness | 8.5 | 8 | 8.5 |
+| Clarity | 8.5 | 8 | 8 |
+| Efficiency | 8 | 8 | 8 |
+| Learnability | 8 | 8 | 8 |
+| Layout & Composition | 8.5 | 8 | 8.5 |
+| Typography | 8 | 8 | 8 |
+| Color theory & contrast | 8.5 | 8 | 8.5 |
+| Whitespace | 8 | 8 | 8 |
+| Perceived performance | 8.5 | 8 | 8 |
+| Accessibility | 8 | 8 | 8 |
+
+Complete reports are in `/tmp/lor-ui-overhaul/round-7/`:
+`REVIEW-gpt-6.1-sol.md`, `REVIEW-gpt-6.1-terra.md`, and
+`REVIEW-claude-opus-5-5.md`. That directory also contains the image and source
+hash manifests, exact model/task receipts, final scores, and validation log
+references. The review log is committed; the seeded artifacts stay outside
+Git. The local before/after viewer is `/tmp/lor-ui-overhaul/UI-COMPARISON.html`.
+
+The UI and browser harness hashes remained identical throughout the final
+reviews. The final acceptance checkpoint changes only this review record.
+No deployment or push is part of this work; backend/API/security-model files
+are unchanged by the overhaul.
+
+### Non-blocking follow-ups and evidence limits
+
+The council still recommends stronger recovery-help discovery on Login,
+a durable runbook location, error-page document titles, and refinement of
+phone audit density and small metadata. Opus identified a possible focus
+loss after a failed Older request; this was inferred from source, was not
+reproduced, and was explicitly rated non-blocking. It remains a follow-up,
+alongside transient single-result pager layout changes and minor identity,
+time-format and startup-handoff polish.
+
+The scores come from screenshots, source and supplied executed assertions.
+They do not certify real-device, screen-reader, zoom, multi-browser or
+measured-latency behavior. Every reviewer distinguishes its own inspection
+from the test suites run by the primary agent. These are assurance limits,
+not outstanding requirements for the agreed council threshold.
 
 ## Validation
 
