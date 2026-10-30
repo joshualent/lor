@@ -10,6 +10,17 @@ allowed, and authorize with a passkey tap. The agent then runs
 `lor ssh nas -- <cmd>` until the certificate expires; each command shows up in
 Lor. You can also grant access before the agent asks, extend, and revoke.
 
+**Install** (details at <https://lor.hyperf.app>):
+
+```sh
+curl -fsSL https://lor.hyperf.app/install.sh | sh                        # agent CLI (Linux, macOS)
+curl -fsSL https://lor.hyperf.app/install.sh | sudo sh -s -- --server    # lor-server (Linux, systemd)
+```
+
+The installer downloads the latest [release](https://github.com/joshualent/lor/releases)
+and checks it against the release's `SHA256SUMS`. Options: `--skill` (also
+install the agent skill), `--version vX.Y.Z`, `--dir DIR`.
+
 The full design is in [docs/plan.md](docs/plan.md). Deviations from it are in
 [docs/deviations.md](docs/deviations.md); the operations runbook is in
 [docs/runbook.md](docs/runbook.md).
@@ -34,6 +45,7 @@ The full design is in [docs/plan.md](docs/plan.md). Deviations from it are in
 | `web/` | the SvelteKit web UI (embedded into `lor-server`) |
 | `skill/SKILL.md` | the agent skill |
 | `deploy/` | example config, systemd unit and Caddy site |
+| `site/` | the public site and installer at lor.hyperf.app (GitHub Pages) |
 | `test/e2e`, `test/integration` | Playwright and Docker/OpenSSH tests |
 
 ## Building
@@ -62,6 +74,19 @@ DISTRO=ubuntu:26.04 make integration       # real OpenSSH in Docker (needs Docke
 CI runs all of them, with the integration tests on Debian 12, Debian 13,
 Ubuntu 22.04, 24.04 and 26.04.
 
+### Releases and the site
+
+Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml`: `make dist`
+builds `lor` (Linux and macOS, amd64 and arm64) and `lor-server` (Linux,
+amd64 and arm64) as `<binary>_<os>_<arch>.tar.gz` plus `SHA256SUMS`, and
+publishes them as a GitHub release. Asset names carry no version, so
+`releases/latest/download/…` (which `site/install.sh` uses) always gets the
+newest one. Tags with a `-` (`v0.2.0-rc.1`) become prereleases, which
+`latest` skips.
+
+`site/` is deployed to GitHub Pages by `.github/workflows/pages.yml` whenever
+it changes on `main`; `make site` assembles it in `dist/site/`.
+
 ## Development
 
 ```sh
@@ -87,7 +112,9 @@ Proxmox notes from the field test: unprivileged Ubuntu 26.04 LXCs (systemd
 PATH that doesn't include `/usr/local/bin`, so call
 `/usr/local/bin/lor-server` with its full path there.
 
-1. **Install the server** on the Lor LXC:
+1. **Install the server** on the Lor LXC. The installer does all of this
+   (`curl -fsSL https://lor.hyperf.app/install.sh | sudo sh -s -- --server`)
+   except starting the service; by hand, from a release archive or `bin/`:
 
    ```sh
    install -m 0755 bin/lor-server /usr/local/bin/
@@ -177,7 +204,8 @@ PATH that doesn't include `/usr/local/bin`, so call
 ### Enrolling an agent
 
 1. Give the agent LXC a fixed LAN IP (unprivileged LXC; no Tailscale needed).
-2. Install the CLI: `install -m 0755 bin/lor /usr/local/bin/`.
+2. Install the CLI: `curl -fsSL https://lor.hyperf.app/install.sh | sh`
+   (or `install -m 0755 bin/lor /usr/local/bin/`).
 3. In the UI, **Agents → Add agent** with a name and that LAN IP. Lor shows a
    one-time command (valid 15 minutes); run it in the agent LXC:
 
@@ -188,7 +216,8 @@ PATH that doesn't include `/usr/local/bin`, so call
    The CLI pins Lor's TLS certificate and stores its token in
    `~/.config/lor/config.toml` (0600). It only works from the registered IP.
 4. Put the skill where the agent finds it, e.g.
-   `~/.claude/skills/lor-access/SKILL.md` (copy `skill/SKILL.md`).
+   `~/.claude/skills/lor-access/SKILL.md` (copy `skill/SKILL.md`, or pass
+   `--skill` to the installer: `… | sh -s -- --skill`).
 
 ## Using it
 

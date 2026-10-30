@@ -4,8 +4,13 @@ PNPM    ?= pnpm
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/joshualent/lor/internal/version.Version=$(VERSION)
 BIN     := bin
+DIST    := dist
 
-.PHONY: all generate web web-deps build test test-go test-web e2e screens integration lint dev clean
+# Release targets. lor-server is Linux-only (systemd); the CLI also runs on macOS.
+CLI_PLATFORMS    := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
+SERVER_PLATFORMS := linux/amd64 linux/arm64
+
+.PHONY: all generate web web-deps build dist site test test-go test-web e2e screens integration lint dev clean
 
 all: build
 
@@ -28,6 +33,35 @@ web: web-deps
 build: web
 	@mkdir -p $(BIN)
 	CGO_ENABLED=0 $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN)/ ./cmd/...
+
+## dist: release archives for every platform plus SHA256SUMS in dist/release (the release workflow uploads them).
+## Asset names carry no version so releases/latest/download/<name> always works for site/install.sh.
+dist: web
+	rm -rf $(DIST)/release $(DIST)/stage
+	@mkdir -p $(DIST)/release
+	@set -e; for p in $(CLI_PLATFORMS); do \
+		os=$${p%/*}; arch=$${p#*/}; d=$(DIST)/stage/lor_$${os}_$${arch}; mkdir -p $$d; \
+		echo "lor $$os/$$arch"; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $$d/lor ./cmd/lor; \
+		cp README.md skill/SKILL.md $$d/; \
+		tar -C $$d --owner=0 --group=0 --numeric-owner -czf $(DIST)/release/lor_$${os}_$${arch}.tar.gz lor SKILL.md README.md; \
+	done
+	@set -e; for p in $(SERVER_PLATFORMS); do \
+		os=$${p%/*}; arch=$${p#*/}; d=$(DIST)/stage/lor-server_$${os}_$${arch}; mkdir -p $$d; \
+		echo "lor-server $$os/$$arch"; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch $(GO) build -trimpath -ldflags '$(LDFLAGS)' -o $$d/lor-server ./cmd/lor-server; \
+		cp README.md deploy/lor-server.toml deploy/lor-server.service deploy/Caddyfile.example $$d/; \
+		tar -C $$d --owner=0 --group=0 --numeric-owner -czf $(DIST)/release/lor-server_$${os}_$${arch}.tar.gz \
+			lor-server lor-server.toml lor-server.service Caddyfile.example README.md; \
+	done
+	cd $(DIST)/release && sha256sum *.tar.gz > SHA256SUMS
+	rm -rf $(DIST)/stage
+
+## site: the GitHub Pages site (lor.hyperf.app) in dist/site; the pages workflow deploys it.
+site:
+	rm -rf $(DIST)/site
+	@mkdir -p $(DIST)/site
+	cp site/index.html site/install.sh web/static/favicon.svg $(DIST)/site/
 
 ## test: everything that doesn't need Docker.
 test: test-go test-web
@@ -64,4 +98,4 @@ dev: web
 	$(PNPM) -C web dev
 
 clean:
-	rm -rf $(BIN) web/build web/.svelte-kit
+	rm -rf $(BIN) $(DIST) web/build web/.svelte-kit

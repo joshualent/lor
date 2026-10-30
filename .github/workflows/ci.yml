@@ -36,6 +36,8 @@ jobs:
           cache-dependency-path: web/pnpm-lock.yaml
       - name: Install shellcheck and ssh-keygen
         run: sudo apt-get update && sudo apt-get install -y shellcheck openssh-client
+      - name: shellcheck the installer
+        run: shellcheck site/install.sh
       - name: Build (SPA embedded)
         run: make build
       - name: Generated code is up to date
